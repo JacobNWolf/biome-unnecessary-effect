@@ -1,84 +1,102 @@
 language js;
 
-// Rule: avoidEmptyEffect
-`$effect(() => {}, $_)` where {
-    $effect <: or(
-        `useEffect`,
-        `useLayoutEffect`,
-        `React.useEffect`,
-        `React.useLayoutEffect`
-    ),
-    register_diagnostic(
-        span = $,
-        message = "This effect is empty and could be removed."
-    )
-}
+sequential {
+    // Rule: avoidEmptyEffect
+    `useEffect(() => {}, $_)` as $effect where {
+        register_diagnostic(
+            span = $effect,
+            message = "This effect is empty and could be removed."
+        )
+    },
+    
+    `useLayoutEffect(() => {}, $_)` as $effect where {
+        register_diagnostic(
+            span = $effect,
+            message = "This effect is empty and could be removed."
+        )
+    },
+    
+    `React.useEffect(() => {}, $_)` as $effect where {
+        register_diagnostic(
+            span = $effect,
+            message = "This effect is empty and could be removed."
+        )
+    },
+    
+    `React.useLayoutEffect(() => {}, $_)` as $effect where {
+        register_diagnostic(
+            span = $effect,
+            message = "This effect is empty and could be removed."
+        )
+    },
 
-// Rule: avoidInitializingState
-`function $_Component($_) {
-    $_body
-}` where {
-    $_body <: contains `const [$state, $setter] = useState($_)` as $useState,
-    $_body <: contains `$effect(() => { $setter($_) }, [])` as $effect_call,
-    $effect <: or(
-        `useEffect`,
-        `useLayoutEffect`,
-        `React.useEffect`,
-        `React.useLayoutEffect`
-    ),
-    register_diagnostic(
-        span = $effect_call,
-        message = `Avoid initializing state in an effect. Instead, pass "${$state}"'s initial value to its \`useState\`.`,
-    )
-}
+    // Rule: avoidInitializingState - simplified to just match the pattern
+    `useEffect(() => { $setter($_) }, [])` as $effect_call where {
+        register_diagnostic(
+            span = $effect_call,
+            message = "Avoid initializing state in an effect. Instead, pass the initial value to useState."
+        )
+    },
 
-// Rule: avoidDerivedOrChainedState
-// This is a simplified combination of the `avoidDerivedState` and `avoidChainingState` rules.
-// It flags effects that have dependencies and whose only purpose is to set state.
-// This is a strong signal that state is being derived or chained.
-`function $_Component($_) {
-    $_body
-}` where {
-    $_body <: contains `const [$state, $setter] = useState($_)`,
-    $_body <: contains `$effect(() => { $setter($_) }, [$_dep, ...])` as $effect_call,
-    $effect <: or(`useEffect`, `useLayoutEffect`),
-    register_diagnostic(
-        span = $effect_call,
-        message = "Avoid storing derived state or chaining state updates. Consider computing this value during render or updating all state in a single event handler."
-    )
-}
+    `useLayoutEffect(() => { $setter($_) }, [])` as $effect_call where {
+        register_diagnostic(
+            span = $effect_call,
+            message = "Avoid initializing state in an effect. Instead, pass the initial value to useState."
+        )
+    },
 
-// Rule: avoidParentChildCoupling
-// An effect that calls a prop function based on a state change couples the
-// child to the parent in a way that can often be simplified by lifting state.
-`function $_Component({ $callback, $_rest_props }) {
-    $_body
-}` where {
-    $_body <: contains `const [$state, $_] = useState($_)`,
-    $_body <: contains `$effect(() => { $callback($_) }, [$state])` as $effect_call,
-    $effect <: or(`useEffect`, `useLayoutEffect`),
-    register_diagnostic(
-        span = $effect_call,
-        message = "Avoid coupling parent behavior or state to a child component. Instead, lift shared logic or state up to the parent."
-    )
-}
+    // Rule: avoidDerivedOrChainedState - match effects with dependencies that call setters
+    `useEffect(() => { $setter($_) }, [$_dep, ...])` as $effect_call where {
+        register_diagnostic(
+            span = $effect_call,
+            message = "Avoid storing derived state or chaining state updates. Consider computing this value during render or updating all state in a single event handler."
+        )
+    },
 
-// Rule: avoidEventHandler
-// An effect that uses an `if` statement to check a state variable before doing something
-// is often using state as an event handler.
-`function $_Component($_) {
-    $_body
-}` where {
-    $_body <: contains `const [$state, $_] = useState($_)`,
-    $_body <: contains `$effect(() => {
-        if ($condition) {
+    `useLayoutEffect(() => { $setter($_) }, [$_dep, ...])` as $effect_call where {
+        register_diagnostic(
+            span = $effect_call,
+            message = "Avoid storing derived state or chaining state updates. Consider computing this value during render or updating all state in a single event handler."
+        )
+    },
+
+    // Rule: avoidParentChildCoupling - match effects that call functions from props
+    `useEffect(() => { $callback($_) }, [$_deps, ...])` as $effect_call where {
+        register_diagnostic(
+            span = $effect_call,
+            message = "Avoid coupling parent behavior or state to a child component. Instead, lift shared logic or state up to the parent.",
+            severity = "info"
+        )
+    },
+
+    `useLayoutEffect(() => { $callback($_) }, [$_deps, ...])` as $effect_call where {
+        register_diagnostic(
+            span = $effect_call,
+            message = "Avoid coupling parent behavior or state to a child component. Instead, lift shared logic or state up to the parent.",
+            severity = "info"
+        )
+    },
+
+    // Rule: avoidEventHandler - match effects with if statements
+    `useEffect(() => {
+        if ($_condition) {
             $_
         }
-    }, [$state])` as $effect_call,
-    $condition <: contains `$state`,
-    $effect <: or(`useEffect`, `useLayoutEffect`),
-    register_diagnostic(
-        span = $effect_call,
-        message = "Avoid using state as an event handler. Instead, call the event handler directly."
-    )
+    }, [$_deps, ...])` as $effect_call where {
+        register_diagnostic(
+            span = $effect_call,
+            message = "Avoid using state as an event handler. Instead, call the event handler directly."
+        )
+    },
+
+    `useLayoutEffect(() => {
+        if ($_condition) {
+            $_
+        }
+    }, [$_deps, ...])` as $effect_call where {
+        register_diagnostic(
+            span = $effect_call,
+            message = "Avoid using state as an event handler. Instead, call the event handler directly."
+        )
+    }
 }
