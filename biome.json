@@ -17,6 +17,7 @@
       "**/*.grit"
     ]
   },
+  "plugins": ["./grit/react-effects.grit"],
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
