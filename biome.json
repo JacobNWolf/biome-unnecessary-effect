@@ -1,0 +1,116 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.0.6/schema.json",
+  "vcs": {
+    "enabled": false,
+    "clientKind": "git",
+    "useIgnoreFile": false
+  },
+  "files": {
+    "ignoreUnknown": false,
+    "includes": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js",
+      "**/*.jsx",
+      "**/*.json",
+      "**/*.md",
+      "**/*.grit"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "formatWithErrors": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "lineWidth": 120,
+      "semicolons": "always",
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "trailingCommas": "all"
+    },
+    "jsxRuntime": "transparent"
+  },
+  "grit": {
+    "formatter": {
+      "enabled": true,
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "lineWidth": 120
+    },
+    "linter": {
+      "enabled": true
+    },
+    "assist": {
+      "enabled": true
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "options": {
+            "groups": [
+              { "type": true },
+              ":NODE:",
+              ":BLANK_LINE:",
+              ["react", "react/**", "react-*"],
+              ":BLANK_LINE:",
+              [
+                "**",
+                "!@/**",
+                "!**/hooks/**",
+                "!**/components/**",
+                "!**/types/**",
+                "!**/interfaces/**",
+                "!**/utils/**",
+                "!**/context/**",
+                "!**/routes/**",
+                "!**/pages/**",
+                "!**/services/**",
+                "!**/stores/**",
+                "!**/ui/**",
+                "!**/values/**",
+                "!**/constants/**"
+              ],
+              ":BLANK_LINE:",
+              ["@/**", "~/**"],
+              ":BLANK_LINE:",
+              "**/context/**",
+              ":BLANK_LINE:",
+              ["**/routes/**", "**/pages/**"],
+              ":BLANK_LINE:",
+              ["**/hooks/**", "**/services/**", "**/stores/**"],
+              ":BLANK_LINE:",
+              ["**/components/**", "**/ui/**"],
+              ":BLANK_LINE:",
+              "**/utils/**",
+              ":BLANK_LINE:",
+              [
+                "**/types/**",
+                "**/interfaces/**",
+                "**/values/**",
+                "**/constants/**"
+              ],
+              ":BLANK_LINE:",
+              "../**",
+              ["./**", "./", "."],
+              ":BLANK_LINE:",
+              ["**/*.css", "**/*.scss"]
+            ]
+          }
+        }
+      }
+    }
+  }
+}
