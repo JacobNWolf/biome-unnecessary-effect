@@ -1,229 +1,224 @@
 language js
 
 any {
-    // Rule: avoidEmptyEffect
-    `useEffect(() => {}, $_)` as $effect where {
-        register_diagnostic(span=$effect, message="This effect is empty and could be removed.")
+  // Rule: avoidEmptyEffect
+  `useEffect(() => {}, $_)` as $effect where {
+    register_diagnostic(span=$effect, message="This effect is empty and could be removed.")
+  },
+  `useLayoutEffect(() => {}, $_)` as $effect where {
+    register_diagnostic(span=$effect, message="This effect is empty and could be removed.")
+  },
+  // Rule: avoidInitializingState
+  `useEffect($body, [])` as $effect where {
+    or {
+      $body <: contains `setName($_)`,
+      $body <: contains `setState($_)`,
+      $body <: contains `setValue($_)`,
+      $body <: contains `setData($_)`,
+      $body <: contains `setLoading($_)`,
+      $body <: contains `setError($_)`,
+      $body <: contains `setCount($_)`,
+      $body <: contains `setItems($_)`,
+      $body <: contains `setUser($_)`,
+      $body <: contains `setConfig($_)`,
+      $body <: contains r"set[A-Z][a-zA-Z]*\s*\("
     },
-    `useLayoutEffect(() => {}, $_)` as $effect where {
-        register_diagnostic(span=$effect, message="This effect is empty and could be removed.")
+    $body <: not contains `async`,
+    $body <: not contains `fetch`,
+    $body <: not contains `await`,
+    register_diagnostic(span=$effect, message="Avoid initializing state in an effect. Instead, pass the initial value to useState.")
+  },
+  `useLayoutEffect($body, [])` as $effect where {
+    or {
+      $body <: contains `setName($_)`,
+      $body <: contains `setState($_)`,
+      $body <: contains `setValue($_)`,
+      $body <: contains `setData($_)`,
+      $body <: contains `setLoading($_)`,
+      $body <: contains `setError($_)`,
+      $body <: contains `setCount($_)`,
+      $body <: contains `setItems($_)`,
+      $body <: contains `setUser($_)`,
+      $body <: contains `setConfig($_)`,
+      $body <: contains r"set[A-Z][a-zA-Z]*\s*\("
     },
-
-    // Rule: avoidInitializingState
-    `useEffect($body, [])` as $effect where {
-        or {
-            $body <: contains `setName($_)`,
-            $body <: contains `setState($_)`,
-            $body <: contains `setValue($_)`,
-            $body <: contains `setData($_)`,
-            $body <: contains `setLoading($_)`,
-            $body <: contains `setError($_)`,
-            $body <: contains `setCount($_)`,
-            $body <: contains `setItems($_)`,
-            $body <: contains `setUser($_)`,
-            $body <: contains `setConfig($_)`,
-            $body <: contains r"set[A-Z][a-zA-Z]*\s*\("
-        },
-        $body <: not contains `async`,
-        $body <: not contains `fetch`,
-        $body <: not contains `await`,
-        register_diagnostic(span=$effect, message="Avoid initializing state in an effect. Instead, pass the initial value to useState.")
+    $body <: not contains `async`,
+    $body <: not contains `fetch`,
+    $body <: not contains `await`,
+    register_diagnostic(span=$effect, message="Avoid initializing state in an effect. Instead, pass the initial value to useState.")
+  },
+  // Rule: avoidDerivedOrChainedState
+  `useEffect($body, [$deps])` as $effect where {
+    $deps <: not undefined,
+    or {
+      $body <: contains `setDerived($_)`,
+      $body <: contains `setState($_)`,
+      $body <: contains `setValue($_)`,
+      $body <: contains `setData($_)`,
+      $body <: contains `setLoading($_)`,
+      $body <: contains `setError($_)`,
+      $body <: contains `setCount($_)`,
+      $body <: contains `setItems($_)`,
+      $body <: contains `setUser($_)`,
+      $body <: contains `setConfig($_)`,
+      $body <: contains r"set[A-Z][a-zA-Z]*\s*\("
     },
-    `useLayoutEffect($body, [])` as $effect where {
-        or {
-            $body <: contains `setName($_)`,
-            $body <: contains `setState($_)`,
-            $body <: contains `setValue($_)`,
-            $body <: contains `setData($_)`,
-            $body <: contains `setLoading($_)`,
-            $body <: contains `setError($_)`,
-            $body <: contains `setCount($_)`,
-            $body <: contains `setItems($_)`,
-            $body <: contains `setUser($_)`,
-            $body <: contains `setConfig($_)`,
-            $body <: contains r"set[A-Z][a-zA-Z]*\s*\("
-        },
-        $body <: not contains `async`,
-        $body <: not contains `fetch`,
-        $body <: not contains `await`,
-        register_diagnostic(span=$effect, message="Avoid initializing state in an effect. Instead, pass the initial value to useState.")
+    $body <: not contains `return () =>`,
+    $body <: not contains `return function`,
+    $body <: not contains `async`,
+    $body <: not contains `fetch`,
+    $body <: not contains `await`,
+    $body <: not contains `axios`,
+    register_diagnostic(span=$effect, message="Avoid storing derived state or chaining state updates. Consider computing this value during render or updating all state in a single event handler.")
+  },
+  `useLayoutEffect($body, [$deps])` as $effect where {
+    $deps <: not undefined,
+    or {
+      $body <: contains `setDerived($_)`,
+      $body <: contains `setState($_)`,
+      $body <: contains `setValue($_)`,
+      $body <: contains `setData($_)`,
+      $body <: contains `setLoading($_)`,
+      $body <: contains `setError($_)`,
+      $body <: contains `setCount($_)`,
+      $body <: contains `setItems($_)`,
+      $body <: contains `setUser($_)`,
+      $body <: contains `setConfig($_)`,
+      $body <: contains r"set[A-Z][a-zA-Z]*\s*\("
     },
-
-    // Rule: avoidDerivedOrChainedState
-    `useEffect($body, [$deps])` as $effect where {
-        $deps <: not undefined,
-        or {
-            $body <: contains `setDerived($_)`,
-            $body <: contains `setState($_)`,
-            $body <: contains `setValue($_)`,
-            $body <: contains `setData($_)`,
-            $body <: contains `setLoading($_)`,
-            $body <: contains `setError($_)`,
-            $body <: contains `setCount($_)`,
-            $body <: contains `setItems($_)`,
-            $body <: contains `setUser($_)`,
-            $body <: contains `setConfig($_)`,
-            $body <: contains r"set[A-Z][a-zA-Z]*\s*\("
-        },
-        $body <: not contains `return () =>`,
-        $body <: not contains `return function`,
-        $body <: not contains `async`,
-        $body <: not contains `fetch`,
-        $body <: not contains `await`,
-        $body <: not contains `axios`,
-        register_diagnostic(span=$effect, message="Avoid storing derived state or chaining state updates. Consider computing this value during render or updating all state in a single event handler.")
+    $body <: not contains `return () =>`,
+    $body <: not contains `return function`,
+    $body <: not contains `async`,
+    $body <: not contains `fetch`,
+    $body <: not contains `await`,
+    $body <: not contains `axios`,
+    register_diagnostic(span=$effect, message="Avoid storing derived state or chaining state updates. Consider computing this value during render or updating all state in a single event handler.")
+  },
+  // Rule: avoidDataFetchingInEffect
+  `useEffect($body, $_)` as $effect where {
+    $body <: contains or {
+      `fetch($_)`,
+      `fetch()`,
+      `axios($_)`,
+      `axios()`,
+      `axios.$method($_)`,
+      `axios.$method()`,
+      `$client.get($_)`,
+      `$client.get()`,
+      `$client.post($_)`,
+      `$client.post()`,
+      `$client.put($_)`,
+      `$client.put()`,
+      `$client.delete($_)`,
+      `$client.delete()`,
+      `$client.patch($_)`,
+      `$client.patch()`,
+      `$client.request($_)`,
+      `$client.request()`,
+      `$.ajax($_)`,
+      `$.ajax()`,
+      `$.get($_)`,
+      `$.get()`,
+      `$.post($_)`,
+      `$.post()`
     },
-    `useLayoutEffect($body, [$deps])` as $effect where {
-        $deps <: not undefined,
-        or {
-            $body <: contains `setDerived($_)`,
-            $body <: contains `setState($_)`,
-            $body <: contains `setValue($_)`,
-            $body <: contains `setData($_)`,
-            $body <: contains `setLoading($_)`,
-            $body <: contains `setError($_)`,
-            $body <: contains `setCount($_)`,
-            $body <: contains `setItems($_)`,
-            $body <: contains `setUser($_)`,
-            $body <: contains `setConfig($_)`,
-            $body <: contains r"set[A-Z][a-zA-Z]*\s*\("
-        },
-        $body <: not contains `return () =>`,
-        $body <: not contains `return function`,
-        $body <: not contains `async`,
-        $body <: not contains `fetch`,
-        $body <: not contains `await`,
-        $body <: not contains `axios`,
-        register_diagnostic(span=$effect, message="Avoid storing derived state or chaining state updates. Consider computing this value during render or updating all state in a single event handler.")
+    register_diagnostic(span=$effect, message="Avoid fetching data directly in useEffect. Consider using a data fetching library like React/TanStack Query or SWR for better error handling, caching, and loading states.", severity="warn")
+  },
+  `useLayoutEffect($body, $_)` as $effect where {
+    $body <: contains or {
+      `fetch($_)`,
+      `fetch()`,
+      `axios($_)`,
+      `axios()`,
+      `axios.$method($_)`,
+      `axios.$method()`,
+      `$client.get($_)`,
+      `$client.get()`,
+      `$client.post($_)`,
+      `$client.post()`,
+      `$client.put($_)`,
+      `$client.put()`,
+      `$client.delete($_)`,
+      `$client.delete()`,
+      `$client.patch($_)`,
+      `$client.patch()`,
+      `$client.request($_)`,
+      `$client.request()`,
+      `$.ajax($_)`,
+      `$.ajax()`,
+      `$.get($_)`,
+      `$.get()`,
+      `$.post($_)`,
+      `$.post()`
     },
-
-    // Rule: avoidDataFetchingInEffect
-    `useEffect($body, $_)` as $effect where {
-        $body <: contains or { 
-            `fetch($_)`, 
-            `fetch()`,
-            `axios($_)`,
-            `axios()`,
-            `axios.$method($_)`,
-            `axios.$method()`,
-            `$client.get($_)`,
-            `$client.get()`,
-            `$client.post($_)`,
-            `$client.post()`,
-            `$client.put($_)`,
-            `$client.put()`,
-            `$client.delete($_)`,
-            `$client.delete()`,
-            `$client.patch($_)`,
-            `$client.patch()`,
-            `$client.request($_)`,
-            `$client.request()`,
-            `$.ajax($_)`,
-            `$.ajax()`,
-            `$.get($_)`,
-            `$.get()`,
-            `$.post($_)`,
-            `$.post()`
-        },
-        register_diagnostic(span=$effect, message="Avoid fetching data directly in useEffect. Consider using a data fetching library like React/TanStack Query or SWR for better error handling, caching, and loading states.", severity="warn")
+    register_diagnostic(span=$effect, message="Avoid fetching data directly in useLayoutEffect. Consider using a data fetching library like React/TanStack Query or SWR for better error handling, caching, and loading states.", severity="warn")
+  },
+  // Rule: avoidParentChildCoupling
+  `useEffect($body, [$deps])` as $effect where {
+    $deps <: not undefined,
+    or {
+      $body <: contains `onRender()`,
+      $body <: contains `onRender($_)`,
+      $body <: contains `callback()`,
+      $body <: contains `callback($_)`,
+      $body <: contains `handler()`,
+      $body <: contains `handler($_)`,
+      $body <: contains `onChange()`,
+      $body <: contains `onChange($_)`,
+      $body <: contains `onUpdate()`,
+      $body <: contains `onUpdate($_)`,
+      $body <: contains `onMount()`,
+      $body <: contains `onMount($_)`,
+      $body <: contains `props.$method()`,
+      $body <: contains `props.$method($_)`
     },
-    `useLayoutEffect($body, $_)` as $effect where {
-        $body <: contains or { 
-            `fetch($_)`, 
-            `fetch()`,
-            `axios($_)`,
-            `axios()`,
-            `axios.$method($_)`,
-            `axios.$method()`,
-            `$client.get($_)`,
-            `$client.get()`,
-            `$client.post($_)`,
-            `$client.post()`,
-            `$client.put($_)`,
-            `$client.put()`,
-            `$client.delete($_)`,
-            `$client.delete()`,
-            `$client.patch($_)`,
-            `$client.patch()`,
-            `$client.request($_)`,
-            `$client.request()`,
-            `$.ajax($_)`,
-            `$.ajax()`,
-            `$.get($_)`,
-            `$.get()`,
-            `$.post($_)`,
-            `$.post()`
-        },
-        register_diagnostic(span=$effect, message="Avoid fetching data directly in useLayoutEffect. Consider using a data fetching library like React/TanStack Query or SWR for better error handling, caching, and loading states.", severity="warn")
+    $body <: not contains r"set[A-Z][a-zA-Z]*\s*\(",
+    $body <: not contains `return () =>`,
+    $body <: not contains `return function`,
+    $body <: not contains `async`,
+    register_diagnostic(span=$effect, message="Avoid coupling parent behavior or state to a child component. Instead, lift shared logic or state up to the parent.", severity="warn")
+  },
+  `useLayoutEffect($body, [$deps])` as $effect where {
+    $deps <: not undefined,
+    or {
+      $body <: contains `onRender()`,
+      $body <: contains `onRender($_)`,
+      $body <: contains `callback()`,
+      $body <: contains `callback($_)`,
+      $body <: contains `handler()`,
+      $body <: contains `handler($_)`,
+      $body <: contains `onChange()`,
+      $body <: contains `onChange($_)`,
+      $body <: contains `onUpdate()`,
+      $body <: contains `onUpdate($_)`,
+      $body <: contains `onMount()`,
+      $body <: contains `onMount($_)`,
+      $body <: contains `props.$method()`,
+      $body <: contains `props.$method($_)`
     },
-
-    // Rule: avoidParentChildCoupling
-    `useEffect($body, [$deps])` as $effect where {
-        $deps <: not undefined,
-        or {
-            $body <: contains `onRender()`,
-            $body <: contains `onRender($_)`,
-            $body <: contains `callback()`,
-            $body <: contains `callback($_)`,
-            $body <: contains `handler()`,
-            $body <: contains `handler($_)`,
-            $body <: contains `onChange()`,
-            $body <: contains `onChange($_)`,
-            $body <: contains `onUpdate()`,
-            $body <: contains `onUpdate($_)`,
-            $body <: contains `onMount()`,
-            $body <: contains `onMount($_)`,
-            $body <: contains `props.$method()`,
-            $body <: contains `props.$method($_)`
-        },
-        $body <: not contains r"set[A-Z][a-zA-Z]*\s*\(",
-        $body <: not contains `return () =>`,
-        $body <: not contains `return function`,
-        $body <: not contains `async`,
-        register_diagnostic(span=$effect, message="Avoid coupling parent behavior or state to a child component. Instead, lift shared logic or state up to the parent.", severity="warn")
-    },
-    `useLayoutEffect($body, [$deps])` as $effect where {
-        $deps <: not undefined,
-        or {
-            $body <: contains `onRender()`,
-            $body <: contains `onRender($_)`,
-            $body <: contains `callback()`,
-            $body <: contains `callback($_)`,
-            $body <: contains `handler()`,
-            $body <: contains `handler($_)`,
-            $body <: contains `onChange()`,
-            $body <: contains `onChange($_)`,
-            $body <: contains `onUpdate()`,
-            $body <: contains `onUpdate($_)`,
-            $body <: contains `onMount()`,
-            $body <: contains `onMount($_)`,
-            $body <: contains `props.$method()`,
-            $body <: contains `props.$method($_)`
-        },
-        $body <: not contains r"set[A-Z][a-zA-Z]*\s*\(",
-        $body <: not contains `return () =>`,
-        $body <: not contains `return function`,
-        $body <: not contains `async`,
-        register_diagnostic(span=$effect, message="Avoid coupling parent behavior or state to a child component. Instead, lift shared logic or state up to the parent.", severity="warn")
-    },
-
-    // Rule: avoidEventHandler
-    `useEffect($body, [$deps])` as $effect where {
-        $deps <: not undefined,
-        $body <: contains `if ($condition) { $ifBody }`,
-        $condition <: not contains `!ignore`,
-        $condition <: not contains `error`,
-        $body <: not contains `return () =>`,
-        $body <: not contains `return function`,
-        register_diagnostic(span=$effect, message="Avoid using state as an event handler. Instead, call the event handler directly.")
-    },
-    `useLayoutEffect($body, [$deps])` as $effect where {
-        $deps <: not undefined,
-        $body <: contains `if ($condition) { $ifBody }`,
-        $condition <: not contains `!ignore`,
-        $condition <: not contains `error`,
-        $body <: not contains `return () =>`,
-        $body <: not contains `return function`,
-        register_diagnostic(span=$effect, message="Avoid using state as an event handler. Instead, call the event handler directly.")
-    }
+    $body <: not contains r"set[A-Z][a-zA-Z]*\s*\(",
+    $body <: not contains `return () =>`,
+    $body <: not contains `return function`,
+    $body <: not contains `async`,
+    register_diagnostic(span=$effect, message="Avoid coupling parent behavior or state to a child component. Instead, lift shared logic or state up to the parent.", severity="warn")
+  },
+  // Rule: avoidEventHandler
+  `useEffect($body, [$deps])` as $effect where {
+    $deps <: not undefined,
+    $body <: contains `if ($condition) { $ifBody }`,
+    $condition <: not contains `!ignore`,
+    $condition <: not contains `error`,
+    $body <: not contains `return () =>`,
+    $body <: not contains `return function`,
+    register_diagnostic(span=$effect, message="Avoid using state as an event handler. Instead, call the event handler directly.")
+  },
+  `useLayoutEffect($body, [$deps])` as $effect where {
+    $deps <: not undefined,
+    $body <: contains `if ($condition) { $ifBody }`,
+    $condition <: not contains `!ignore`,
+    $condition <: not contains `error`,
+    $body <: not contains `return () =>`,
+    $body <: not contains `return function`,
+    register_diagnostic(span=$effect, message="Avoid using state as an event handler. Instead, call the event handler directly.")
+  }
 }
