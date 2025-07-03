@@ -120,7 +120,19 @@ any {
       `$.get($_)`,
       `$.get()`,
       `$.post($_)`,
-      `$.post()`
+      `$.post()`,
+      `api.$method($_)`,
+      `api.$method()`,
+      `api.get($_)`,
+      `api.get()`,
+      `api.post($_)`,
+      `api.post()`,
+      `api.put($_)`,
+      `api.put()`,
+      `api.delete($_)`,
+      `api.delete()`,
+      `api.patch($_)`,
+      `api.patch()`
     },
     register_diagnostic(span=$effect, message="Avoid fetching data directly in useEffect. Consider using a data fetching library like React/TanStack Query or SWR for better error handling, caching, and loading states.", severity="warn")
   },
@@ -149,7 +161,19 @@ any {
       `$.get($_)`,
       `$.get()`,
       `$.post($_)`,
-      `$.post()`
+      `$.post()`,
+      `api.$method($_)`,
+      `api.$method()`,
+      `api.get($_)`,
+      `api.get()`,
+      `api.post($_)`,
+      `api.post()`,
+      `api.put($_)`,
+      `api.put()`,
+      `api.delete($_)`,
+      `api.delete()`,
+      `api.patch($_)`,
+      `api.patch()`
     },
     register_diagnostic(span=$effect, message="Avoid fetching data directly in useLayoutEffect. Consider using a data fetching library like React/TanStack Query or SWR for better error handling, caching, and loading states.", severity="warn")
   },
