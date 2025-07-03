@@ -1,13 +1,24 @@
 {
-  "name": "biome-unnecessary-effect",
-  "private": true,
+  "name": "@jacobwolf/biome-unnecessary-effect",
+  "version": "0.1.0",
+  "private": false,
   "scripts": {
     "test": "bun test",
     "format": "biome format",
     "format:fix": "biome format --write",
     "lint": "biome lint",
-    "lint:fix": "biome lint --write"
+    "lint:fix": "biome lint --write",
+    "build:plugin": "sh scripts/build.sh",
+    "prepublishOnly": "bun run build:plugin",
+    "postinstall": "node scripts/postinstall.js"
   },
+  "files": [
+    "grit",
+    "scripts/postinstall.js",
+    "bin",
+    "LICENSE",
+    "README.md"
+  ],
   "devDependencies": {
     "@biomejs/biome": "2.0.6",
     "@types/bun": "1.2.18",
