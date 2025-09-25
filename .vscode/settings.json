@@ -1,6 +1,3 @@
 {
-    "conventionalCommits.scopes": [
-        "binaries",
-        "rules"
-    ]
+  "conventionalCommits.scopes": ["binaries", "rules"]
 }
