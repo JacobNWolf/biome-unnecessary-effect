@@ -1,6 +1,6 @@
-const { execFile } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+const { execFile } = require('node:child_process');
+const path = require('node:path');
+const fs = require('node:fs');
 
 const platform = process.platform;
 const arch = process.arch;
