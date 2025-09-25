@@ -5,7 +5,7 @@ const fs = require('fs');
 const platform = process.platform;
 const arch = process.arch;
 
-let binaryName;
+let binaryName = null;
 
 const platformArchMapping = {
   'darwin-x64': 'setup-darwin-amd64',
@@ -36,7 +36,9 @@ if (!fs.existsSync(binaryPath)) {
   process.exit(1);
 }
 
-const child = execFile(binaryPath, (error, stdout, stderr) => {
+const projectRoot = process.env.INIT_CWD || process.env.npm_config_local_prefix || process.cwd();
+
+const child = execFile(binaryPath, { cwd: projectRoot }, (error, stdout, stderr) => {
   if (error) {
     console.error(`Error executing plugin setup: ${error}`);
     if (stderr) console.error(stderr);
