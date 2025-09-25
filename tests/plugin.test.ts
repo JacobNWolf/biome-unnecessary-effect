@@ -79,4 +79,14 @@ describe('unnecessary-effect plugin', () => {
     const { exitCode } = runBiome(resolve(FIXTURES_PATH, 'valid-effect.tsx'));
     expect(exitCode).toBe(0);
   });
+
+  test('should not report registering editor transforms', () => {
+    const { exitCode } = runBiome(resolve(FIXTURES_PATH, 'valid-editor-transform-effect.tsx'));
+    expect(exitCode).toBe(0);
+  });
+
+  test('should respect suppression comments', () => {
+    const { exitCode } = runBiome(resolve(FIXTURES_PATH, 'suppression.tsx'));
+    expect(exitCode).toBe(0);
+  });
 });
