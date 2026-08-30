@@ -19,6 +19,9 @@
     "LICENSE",
     "README.md"
   ],
+  "keywords": [
+    "biome-plugin"
+  ],
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
     "@types/bun": "1.2.22",
