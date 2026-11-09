@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v77
+        uses: actions/checkout@v7
 
       - name: Setup Bun
         uses: jdx/mise-action@v5
