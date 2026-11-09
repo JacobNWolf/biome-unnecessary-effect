@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	pluginName          = "@jacobwolf/biome-unnecessary-effect"
+	pluginName           = "@jacobwolf/biome-unnecessary-effect"
 	requiredBiomeVersion = "2.0.0"
-	pluginPath          = "node_modules/@jacobwolf/biome-unnecessary-effect/grit/react-effects.grit"
+	rulesDir             = "node_modules/@jacobwolf/biome-unnecessary-effect/grit/rules"
+	legacyPluginPath     = "node_modules/@jacobwolf/biome-unnecessary-effect/grit/react-effects.grit"
 )
 
 type PackageJSON struct {
@@ -25,6 +26,7 @@ type BiomeJSON struct {
 	Plugins []string `json:"plugins"`
 }
 
+// compareVersions compares dotted version strings part by part and returns -1, 0, or 1.
 func compareVersions(v1, v2 string) int {
 	parts1 := strings.Split(v1, ".")
 	parts2 := strings.Split(v2, ".")
@@ -54,6 +56,7 @@ func compareVersions(v1, v2 string) int {
 	return 0
 }
 
+// main applies the plugin configuration to the current project and exits on failure.
 func main() {
 	if err := setupBiomePlugin(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -62,6 +65,8 @@ func main() {
 	fmt.Println("\n✨ Biome plugin setup complete!")
 }
 
+// setupBiomePlugin registers every bundled rule file in the project's biome.json,
+// replacing the single-file v0.1 entry when it is present.
 func setupBiomePlugin() error {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -95,7 +100,7 @@ func setupBiomePlugin() error {
 	fmt.Printf("✅ @biomejs/biome version %s meets the requirement (%s or greater).\n", biomeVersion, requiredBiomeVersion)
 
 	fmt.Println("Configuring biome.json...")
-	
+
 	biomeJSONContent, err := ioutil.ReadFile(biomeJSONPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -104,42 +109,74 @@ func setupBiomePlugin() error {
 		return fmt.Errorf("failed to read biome.json at %s: %w", biomeJSONPath, err)
 	}
 
-    var currentConfig map[string]interface{}
-    if err := json.Unmarshal(biomeJSONContent, &currentConfig); err != nil {
-        return fmt.Errorf("failed to parse biome.json: %w", err)
-    }
+	var currentConfig map[string]interface{}
+	if err := json.Unmarshal(biomeJSONContent, &currentConfig); err != nil {
+		return fmt.Errorf("failed to parse biome.json: %w", err)
+	}
 
-    if _, ok := currentConfig["plugins"]; !ok {
-        currentConfig["plugins"] = []interface{}{}
-    }
-    pluginsList, ok := currentConfig["plugins"].([]interface{})
-    if !ok {
-        return fmt.Errorf("plugins field in biome.json is not a list")
-    }
+	ruleFiles, err := filepath.Glob(filepath.Join(cwd, rulesDir, "*.grit"))
+	if err != nil {
+		return fmt.Errorf("failed to list plugin rule files: %w", err)
+	}
+	if len(ruleFiles) == 0 {
+		return fmt.Errorf("no plugin rule files found in %s", filepath.Join(cwd, rulesDir))
+	}
 
-    found := false
-    for _, p := range pluginsList {
-        if str, ok := p.(string); ok && str == pluginPath {
-            found = true
-            break
-        }
-    }
+	rulePaths := make([]interface{}, 0, len(ruleFiles))
+	for _, file := range ruleFiles {
+		relative, err := filepath.Rel(cwd, file)
+		if err != nil {
+			return fmt.Errorf("failed to resolve plugin path %s: %w", file, err)
+		}
+		rulePaths = append(rulePaths, filepath.ToSlash(relative))
+	}
 
-    if !found {
-        pluginsList = append(pluginsList, pluginPath)
-        currentConfig["plugins"] = pluginsList
-        
-        updatedBiomeJSON, err := json.MarshalIndent(currentConfig, "", "  ")
-        if err != nil {
-            return fmt.Errorf("failed to marshal biome.json: %w", err)
-        }
-        if err := ioutil.WriteFile(biomeJSONPath, updatedBiomeJSON, 0644); err != nil {
-            return fmt.Errorf("failed to write updated biome.json: %w", err)
-        }
-        fmt.Printf("✅ Added %s to biome.json\n", pluginPath)
-    } else {
-        fmt.Printf("ℹ️ %s is already present in biome.json. No changes made.\n", pluginPath)
-    }
+	var pluginsList []interface{}
+	if raw, ok := currentConfig["plugins"]; ok {
+		if pluginsList, ok = raw.([]interface{}); !ok {
+			return fmt.Errorf("plugins field in biome.json is not a list")
+		}
+	}
+
+	updated := make([]interface{}, 0, len(pluginsList)+len(rulePaths))
+	changed := false
+	for _, p := range pluginsList {
+		if str, ok := p.(string); ok && str == legacyPluginPath {
+			changed = true
+			continue
+		}
+		updated = append(updated, p)
+	}
+
+	for _, rulePath := range rulePaths {
+		found := false
+		for _, p := range updated {
+			if str, ok := p.(string); ok && str == rulePath {
+				found = true
+				break
+			}
+		}
+		if !found {
+			updated = append(updated, rulePath)
+			changed = true
+		}
+	}
+
+	if !changed {
+		fmt.Println("ℹ️ Plugin rules are already present in biome.json. No changes made.")
+		return nil
+	}
+
+	currentConfig["plugins"] = updated
+
+	updatedBiomeJSON, err := json.MarshalIndent(currentConfig, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal biome.json: %w", err)
+	}
+	if err := ioutil.WriteFile(biomeJSONPath, updatedBiomeJSON, 0644); err != nil {
+		return fmt.Errorf("failed to write updated biome.json: %w", err)
+	}
+	fmt.Printf("✅ Registered %d plugin rule file(s) in biome.json\n", len(rulePaths))
 
 	return nil
 }

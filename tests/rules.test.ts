@@ -1,7 +1,7 @@
-import { describe, expect, test } from 'bun:test';
 import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { describe, expect, test } from 'bun:test';
 
 const ROOT = join(import.meta.dir, '..');
 const RULES_DIR = join(ROOT, 'grit', 'rules');
@@ -20,6 +20,9 @@ const fixtures = readdirSync(FIXTURES_DIR, { recursive: true, encoding: 'utf8' }
   .filter((file) => /\.[cm]?[jt]sx?$/.test(file))
   .map((file) => ({ file, lines: readFileSync(join(FIXTURES_DIR, file), 'utf8').split('\n') }));
 
+/**
+ * Lists the `file:line` fixture locations that declare an expectation for the given rule.
+ */
 const expected = (rule: string) =>
   fixtures
     .flatMap(({ file, lines }) =>
@@ -36,10 +39,13 @@ const expected = (rule: string) =>
 
 type Diagnostic = { category: string; message: string; location: { path: string; start: { line: number } } };
 
+/**
+ * Lints every fixture with only the given rule enabled and returns the plugin diagnostics.
+ */
 const lint = (rule: string) => {
   const configDir = mkdtempSync(join(tmpdir(), `bue-${rule}-`));
   writeFileSync(join(configDir, 'biome.json'), JSON.stringify({ plugins: [join(RULES_DIR, `${rule}.grit`)] }));
-  const { stdout } = Bun.spawnSync(
+  const { stdout, stderr } = Bun.spawnSync(
     [
       BIOME_BIN,
       'lint',
@@ -51,6 +57,11 @@ const lint = (rule: string) => {
     { cwd: FIXTURES_DIR },
   );
   const text = stdout.toString();
+
+  if (!text.trim()) {
+    throw new Error(`Biome produced no output for ${rule}.\nstderr: ${stderr.toString()}`);
+  }
+
   const report: { diagnostics: Diagnostic[] } = JSON.parse(text.slice(text.indexOf('{')));
   return report.diagnostics.filter((d) => d.category === 'plugin');
 };
