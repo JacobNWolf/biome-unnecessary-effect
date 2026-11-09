@@ -1,0 +1,52 @@
+language js
+
+any {
+  `useEffect($body, [$deps])` as $effect where {
+    $deps <: not undefined,
+    or {
+      $body <: contains `onRender()`,
+      $body <: contains `onRender($_)`,
+      $body <: contains `callback()`,
+      $body <: contains `callback($_)`,
+      $body <: contains `handler()`,
+      $body <: contains `handler($_)`,
+      $body <: contains `onChange()`,
+      $body <: contains `onChange($_)`,
+      $body <: contains `onUpdate()`,
+      $body <: contains `onUpdate($_)`,
+      $body <: contains `onMount()`,
+      $body <: contains `onMount($_)`,
+      $body <: contains `props.$method()`,
+      $body <: contains `props.$method($_)`
+    },
+    $body <: not contains r"set[A-Z][a-zA-Z]*\s*\(",
+    $body <: not contains `return () =>`,
+    $body <: not contains `return function`,
+    $body <: not contains `async`,
+    register_diagnostic(span=$effect, message="Avoid coupling parent behavior or state to a child component. Instead, lift shared logic or state up to the parent.", severity="warn")
+  },
+  `useLayoutEffect($body, [$deps])` as $effect where {
+    $deps <: not undefined,
+    or {
+      $body <: contains `onRender()`,
+      $body <: contains `onRender($_)`,
+      $body <: contains `callback()`,
+      $body <: contains `callback($_)`,
+      $body <: contains `handler()`,
+      $body <: contains `handler($_)`,
+      $body <: contains `onChange()`,
+      $body <: contains `onChange($_)`,
+      $body <: contains `onUpdate()`,
+      $body <: contains `onUpdate($_)`,
+      $body <: contains `onMount()`,
+      $body <: contains `onMount($_)`,
+      $body <: contains `props.$method()`,
+      $body <: contains `props.$method($_)`
+    },
+    $body <: not contains r"set[A-Z][a-zA-Z]*\s*\(",
+    $body <: not contains `return () =>`,
+    $body <: not contains `return function`,
+    $body <: not contains `async`,
+    register_diagnostic(span=$effect, message="Avoid coupling parent behavior or state to a child component. Instead, lift shared logic or state up to the parent.", severity="warn")
+  }
+}

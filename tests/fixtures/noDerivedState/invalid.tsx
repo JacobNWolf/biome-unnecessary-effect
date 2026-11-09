@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 export function DerivedStateComponent({ value }: { value: string }) {
   const [derived, setDerived] = useState('');
 
-  useEffect(() => {
+  useEffect(() => { // expect: noDerivedState
     setDerived(`derived: ${value}`);
   }, [value]);
 

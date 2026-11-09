@@ -1,0 +1,10 @@
+language js
+
+any {
+  `useEffect(() => {}, $_)` as $effect where {
+    register_diagnostic(span=$effect, message="This effect is empty and could be removed.")
+  },
+  `useLayoutEffect(() => {}, $_)` as $effect where {
+    register_diagnostic(span=$effect, message="This effect is empty and could be removed.")
+  }
+}

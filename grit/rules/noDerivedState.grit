@@ -1,0 +1,50 @@
+language js
+
+any {
+  `useEffect($body, [$deps])` as $effect where {
+    $deps <: not undefined,
+    or {
+      $body <: contains `setDerived($_)`,
+      $body <: contains `setState($_)`,
+      $body <: contains `setValue($_)`,
+      $body <: contains `setData($_)`,
+      $body <: contains `setLoading($_)`,
+      $body <: contains `setError($_)`,
+      $body <: contains `setCount($_)`,
+      $body <: contains `setItems($_)`,
+      $body <: contains `setUser($_)`,
+      $body <: contains `setConfig($_)`,
+      $body <: contains r"set[A-Z][a-zA-Z]*\s*\("
+    },
+    $body <: not contains `return () =>`,
+    $body <: not contains `return function`,
+    $body <: not contains `async`,
+    $body <: not contains `fetch`,
+    $body <: not contains `await`,
+    $body <: not contains `axios`,
+    register_diagnostic(span=$effect, message="Avoid storing derived state or chaining state updates. Consider computing this value during render or updating all state in a single event handler.")
+  },
+  `useLayoutEffect($body, [$deps])` as $effect where {
+    $deps <: not undefined,
+    or {
+      $body <: contains `setDerived($_)`,
+      $body <: contains `setState($_)`,
+      $body <: contains `setValue($_)`,
+      $body <: contains `setData($_)`,
+      $body <: contains `setLoading($_)`,
+      $body <: contains `setError($_)`,
+      $body <: contains `setCount($_)`,
+      $body <: contains `setItems($_)`,
+      $body <: contains `setUser($_)`,
+      $body <: contains `setConfig($_)`,
+      $body <: contains r"set[A-Z][a-zA-Z]*\s*\("
+    },
+    $body <: not contains `return () =>`,
+    $body <: not contains `return function`,
+    $body <: not contains `async`,
+    $body <: not contains `fetch`,
+    $body <: not contains `await`,
+    $body <: not contains `axios`,
+    register_diagnostic(span=$effect, message="Avoid storing derived state or chaining state updates. Consider computing this value during render or updating all state in a single event handler.")
+  }
+}

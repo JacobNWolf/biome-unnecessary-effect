@@ -1,0 +1,42 @@
+language js
+
+any {
+  `useEffect($body, [])` as $effect where {
+    or {
+      $body <: contains `setName($_)`,
+      $body <: contains `setState($_)`,
+      $body <: contains `setValue($_)`,
+      $body <: contains `setData($_)`,
+      $body <: contains `setLoading($_)`,
+      $body <: contains `setError($_)`,
+      $body <: contains `setCount($_)`,
+      $body <: contains `setItems($_)`,
+      $body <: contains `setUser($_)`,
+      $body <: contains `setConfig($_)`,
+      $body <: contains r"set[A-Z][a-zA-Z]*\s*\("
+    },
+    $body <: not contains `async`,
+    $body <: not contains `fetch`,
+    $body <: not contains `await`,
+    register_diagnostic(span=$effect, message="Avoid initializing state in an effect. Instead, pass the initial value to useState.")
+  },
+  `useLayoutEffect($body, [])` as $effect where {
+    or {
+      $body <: contains `setName($_)`,
+      $body <: contains `setState($_)`,
+      $body <: contains `setValue($_)`,
+      $body <: contains `setData($_)`,
+      $body <: contains `setLoading($_)`,
+      $body <: contains `setError($_)`,
+      $body <: contains `setCount($_)`,
+      $body <: contains `setItems($_)`,
+      $body <: contains `setUser($_)`,
+      $body <: contains `setConfig($_)`,
+      $body <: contains r"set[A-Z][a-zA-Z]*\s*\("
+    },
+    $body <: not contains `async`,
+    $body <: not contains `fetch`,
+    $body <: not contains `await`,
+    register_diagnostic(span=$effect, message="Avoid initializing state in an effect. Instead, pass the initial value to useState.")
+  }
+}

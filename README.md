@@ -1,9 +1,10 @@
 # Biome - React - Unnecessary Effect
-This is a plugin for [Biome](https://biomejs.dev/), the JavaScript and TypeScript linter, that identifies bad uses of the `useEffect` hook in React. 
 
-This plugin is heavily inspired and the code in it draws on rules in [@NickvanDyke](https://github.com/NickvanDyke)'s [eslint-plugin-react-you-might-not-need-an-effect](https://github.com/NickvanDyke/eslint-plugin-react-you-might-not-need-an-effect) package, which provides a similar functionality for ESLint. 
+This is a plugin for [Biome](https://biomejs.dev/), the JavaScript and TypeScript linter, that identifies bad uses of the `useEffect` hook in React.
 
->[!WARNING] 
+This plugin is heavily inspired and the code in it draws on rules in [@NickvanDyke](https://github.com/NickvanDyke)'s [eslint-plugin-react-you-might-not-need-an-effect](https://github.com/NickvanDyke/eslint-plugin-react-you-might-not-need-an-effect) package, which provides a similar functionality for ESLint.
+
+> [!WARNING] 
 > This plugin is currently a work in progress. While it has been tested to work with the rudimentary examples found in the tests directory, you may find false positives. Please open a GitHub issue if you encounter one.
 
 ## Installation
@@ -38,17 +39,17 @@ bunx biome lint --write
 
 This plugin currently includes the following rules:
 
-*   **avoidEmptyEffect**: Identifies and flags empty `useEffect` or `useLayoutEffect` hooks.
+-   **noEmptyEffect**: Identifies and flags empty `useEffect` or `useLayoutEffect` hooks.
 
-*   **avoidInitializingState**: Flags `useEffect` or `useLayoutEffect` hooks that are used solely for initializing state. This should ideally be done directly with `useState`.
+-   **noInitializeState**: Flags `useEffect` or `useLayoutEffect` hooks that are used solely for initializing state. This should ideally be done directly with `useState`.
 
-*   **avoidDerivedOrChainedState**: Warns against storing derived state or chaining state updates within `useEffect` or `useLayoutEffect`. Consider computing derived values during render or combining state updates into a single event handler.
+-   **noDerivedState**: Warns against storing derived state or chaining state updates within `useEffect` or `useLayoutEffect`. Consider computing derived values during render or combining state updates into a single event handler.
 
-*   **avoidDataFetchingInEffect**: Warns against directly fetching data inside `useEffect` or `useLayoutEffect`. Recommends using data fetching libraries like React Query (TanStack Query) or SWR for better handling of loading, caching, and errors.
+-   **noFetchWithoutCleanup**: Warns against directly fetching data inside `useEffect` or `useLayoutEffect` without a cleanup path. Recommends using data fetching libraries like React Query (TanStack Query) or SWR for better handling of loading, caching, and errors.
 
-*   **avoidParentChildCoupling**: Warns against coupling parent behavior or state to a child component via `useEffect` or `useLayoutEffect`. Suggests lifting shared logic or state up to the parent component.
+-   **noPassLiveStateToParent**: Warns against coupling parent behavior or state to a child component via `useEffect` or `useLayoutEffect`. Suggests lifting shared logic or state up to the parent component.
 
-*   **avoidEventHandler**: Flags `useEffect` or `useLayoutEffect` hooks that behave like event handlers. Instead, the event handler should be called directly.
+-   **noEventHandler**: Flags `useEffect` or `useLayoutEffect` hooks that behave like event handlers. Instead, the event handler should be called directly.
 
 ## Contributing
 

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 export function ParentChildCouplingComponent({ onRender }: { onRender: () => void }) {
-  useEffect(() => {
+  useEffect(() => { // expect: noPassLiveStateToParent
     onRender();
   }, [onRender]);
 
