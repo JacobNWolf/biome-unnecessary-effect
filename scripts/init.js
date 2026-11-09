@@ -19,7 +19,10 @@ const atLeast = (version, min) => {
   return true;
 };
 
-if (process.argv[2] !== 'init') fail(`unknown command. Usage: npx ${PACKAGE} init`);
+const [command, ...flags] = process.argv.slice(2);
+if (command !== 'init' || flags.some((f) => f !== '--deep'))
+  fail(`unknown command. Usage: npx ${PACKAGE} init [--deep]`);
+const deep = flags.includes('--deep');
 
 const cwd = process.cwd();
 const require = createRequire(join(cwd, 'package.json'));
@@ -32,13 +35,17 @@ try {
 if (!atLeast(biomeVersion, MIN_BIOME))
   fail(`Biome ${biomeVersion} is too old; this plugin needs ${MIN_BIOME} or newer.`);
 
+if (deep && !atLeast(biomeVersion, MANIFEST_BIOME))
+  fail(`--deep needs Biome ${MANIFEST_BIOME} or newer, which runs the TypeScript rules.`);
+
 const manifest = JSON.parse(readFileSync(new URL('../biome-manifest.json', import.meta.url), 'utf8'));
 const configPath =
   ['biome.json', 'biome.jsonc'].map((name) => join(cwd, name)).find(existsSync) ?? join(cwd, 'biome.json');
 
 // Biome 2.6+ resolves the preset from the package manifest. Older versions need a path to each rule file,
 // relative to the config file.
-let entries = [`${PACKAGE}/presets/recommended`];
+let entries = [`${PACKAGE}/presets/${deep ? 'deep' : 'recommended'}`];
+if (deep) console.log('Note: biome-ignore comments for noDerivedState must instead name noDerivedStateDeep.');
 if (!atLeast(biomeVersion, MANIFEST_BIOME)) {
   const packagePath = require.resolve
     .paths(PACKAGE)
@@ -68,7 +75,7 @@ const isOurs = (entry) => {
   const normalized = path.replaceAll('\\', '/');
   const packagePath = `node_modules/${PACKAGE}/`;
   return (
-    normalized === `${PACKAGE}/presets/recommended` ||
+    [`${PACKAGE}/presets/recommended`, `${PACKAGE}/presets/deep`].includes(normalized) ||
     normalized.startsWith(packagePath) ||
     normalized.includes(`/${packagePath}`)
   );

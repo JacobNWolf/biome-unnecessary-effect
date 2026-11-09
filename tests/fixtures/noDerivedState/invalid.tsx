@@ -5,21 +5,21 @@ export function Form() {
   const [lastName] = useState('van Dyke');
   const [fullName, setFullName] = useState('');
   useEffect(() => {
-    setFullName(firstName + ' ' + lastName); // expect: noDerivedState
+    setFullName(firstName + ' ' + lastName); // expect: noDerivedState, noDerivedStateDeep
   }, [firstName, lastName]);
   return fullName;
 }
 
 export const Upper = ({ value }: { value: string }) => {
   const [upper, setUpper] = useState('');
-  useEffect(() => setUpper(value.toUpperCase()), [value]); // expect: noDerivedState
+  useEffect(() => setUpper(value.toUpperCase()), [value]); // expect: noDerivedState, noDerivedStateDeep
   return upper;
 };
 
 export function FromProps(props: { value: number }) {
   const [doubled, setDoubled] = useState(0);
   useEffect(() => {
-    setDoubled(props.value * 2); // expect: noDerivedState
+    setDoubled(props.value * 2); // expect: noDerivedState, noDerivedStateDeep
   }, [props.value]);
   return doubled;
 }

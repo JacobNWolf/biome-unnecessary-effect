@@ -16,6 +16,9 @@
         "noDerivedState": "./grit/rules/noDerivedState.grit"
       },
       {
+        "noDerivedStateDeep": "./ts/rules/noDerivedStateDeep.ts"
+      },
+      {
         "noEffectEventOutsideEffect": "./grit/rules/noEffectEventOutsideEffect.grit"
       },
       {
@@ -70,7 +73,24 @@
         "noResetAllStateOnPropChange",
         "noSetStateInEffectWithoutDeps"
       ],
-      "react19": ["preferUseEffectEvent"]
+      "react19": ["preferUseEffectEvent"],
+      "deep": [
+        "noAdjustStateOnPropChange",
+        "noAsyncEffectCallback",
+        "noChainStateUpdates",
+        "noDerivedStateDeep",
+        "noEffectEventOutsideEffect",
+        "noEmptyEffect",
+        "noEventHandler",
+        "noExternalStoreSubscription",
+        "noFetchWithoutCleanup",
+        "noInitializeState",
+        "noPassDataToParent",
+        "noPassLiveStateToParent",
+        "noPassingEffectEvent",
+        "noResetAllStateOnPropChange",
+        "noSetStateInEffectWithoutDeps"
+      ]
     }
   }
 }

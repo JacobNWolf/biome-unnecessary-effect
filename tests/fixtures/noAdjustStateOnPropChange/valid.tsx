@@ -26,7 +26,7 @@ export function PropInArgument({ items }: { items: string[] }) {
   const [selection, setSelection] = useState<string | null>(null);
   const first = items[0] ?? null;
   useEffect(() => {
-    setSelection(first); // expect: noDerivedState
+    setSelection(first); // expect: noDerivedState, noDerivedStateDeep
   }, [items]);
   return selection;
 }
