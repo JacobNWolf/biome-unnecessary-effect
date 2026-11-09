@@ -31,8 +31,8 @@ test.skipIf(major === 2 && minor < 6)('published package works through the Biome
       '  useEffect(() => {',
       '    setDerived(first);',
       '  }, [first]);',
-      '  // biome-ignore lint/plugin/@jacobwolf/biome-unnecessary-effect/noDerivedState: suppression test',
       '  useEffect(() => {',
+      '    // biome-ignore lint/plugin/@jacobwolf/biome-unnecessary-effect/noDerivedState: suppression test',
       '    setDerived(first + "!");',
       '  }, [first]);',
       '  return derived;',
@@ -49,5 +49,5 @@ test.skipIf(major === 2 && minor < 6)('published package works through the Biome
   const lines = diagnostics
     .filter((d: { category: string }) => d.category === 'plugin')
     .map((d: { location: { start: { line: number } } }) => d.location.start.line);
-  expect(lines).toEqual([4]);
+  expect(lines).toEqual([5]);
 });

@@ -4,6 +4,9 @@
   "plugins": {
     "rules": [
       {
+        "noChainStateUpdates": "./grit/rules/noChainStateUpdates.grit"
+      },
+      {
         "noDerivedState": "./grit/rules/noDerivedState.grit"
       },
       {
@@ -24,6 +27,7 @@
     ],
     "presets": {
       "recommended": [
+        "noChainStateUpdates",
         "noDerivedState",
         "noEmptyEffect",
         "noEventHandler",
