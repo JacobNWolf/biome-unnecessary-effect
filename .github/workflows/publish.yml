@@ -1,4 +1,4 @@
-name: Publish to npm
+name: Stage npm release
 
 on:
   release:
@@ -17,6 +17,9 @@ jobs:
       - name: Set up tools
         uses: jdx/mise-action@v5
 
+      - name: Install npm with staged publishing support
+        run: npm install --global npm@11.21.1
+
       - name: Check the release tag matches package.json
         run: |
           version="$(node -p "require('./package.json').version")"
@@ -31,5 +34,5 @@ jobs:
       - name: Run tests
         run: bun test
 
-      - name: Publish package to npm
-        run: npm publish --access public ${{ github.event.release.prerelease && '--tag next' || '' }}
+      - name: Stage package on npm
+        run: npm stage publish --access public ${{ github.event.release.prerelease && '--tag next' || '' }}
