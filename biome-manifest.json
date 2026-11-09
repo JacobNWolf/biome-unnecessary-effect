@@ -4,6 +4,9 @@
   "plugins": {
     "rules": [
       {
+        "noAdjustStateOnPropChange": "./grit/rules/noAdjustStateOnPropChange.grit"
+      },
+      {
         "noChainStateUpdates": "./grit/rules/noChainStateUpdates.grit"
       },
       {
@@ -16,24 +19,37 @@
         "noEventHandler": "./grit/rules/noEventHandler.grit"
       },
       {
+        "noExternalStoreSubscription": "./grit/rules/noExternalStoreSubscription.grit"
+      },
+      {
         "noFetchWithoutCleanup": "./grit/rules/noFetchWithoutCleanup.grit"
       },
       {
         "noInitializeState": "./grit/rules/noInitializeState.grit"
       },
       {
+        "noPassDataToParent": "./grit/rules/noPassDataToParent.grit"
+      },
+      {
         "noPassLiveStateToParent": "./grit/rules/noPassLiveStateToParent.grit"
+      },
+      {
+        "noResetAllStateOnPropChange": "./grit/rules/noResetAllStateOnPropChange.grit"
       }
     ],
     "presets": {
       "recommended": [
+        "noAdjustStateOnPropChange",
         "noChainStateUpdates",
         "noDerivedState",
         "noEmptyEffect",
         "noEventHandler",
+        "noExternalStoreSubscription",
         "noFetchWithoutCleanup",
         "noInitializeState",
-        "noPassLiveStateToParent"
+        "noPassDataToParent",
+        "noPassLiveStateToParent",
+        "noResetAllStateOnPropChange"
       ]
     }
   }
