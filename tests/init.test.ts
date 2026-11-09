@@ -126,10 +126,15 @@ describe('init', () => {
 test('switches to the deep preset with --deep on Biome 2.6+', () => {
   const dir = project('2.6.6', { name: 'biome.json', text: JSON.stringify({ plugins: [PRESET] }) });
 
-  expect(init(dir, '--deep').exitCode).toBe(0);
+  const deepResult = init(dir, '--deep');
+  expect(deepResult.exitCode).toBe(0);
+  expect(deepResult.output).toContain('biome-ignore comments for noDerivedState must instead name noDerivedStateDeep');
   expect(plugins(dir)).toEqual(['@jacobwolf/biome-unnecessary-effect/presets/deep']);
+  expect(init(dir, '--deep').output).toContain('noDerivedStateDeep');
 
-  expect(init(dir).exitCode).toBe(0);
+  const recommendedResult = init(dir);
+  expect(recommendedResult.exitCode).toBe(0);
+  expect(recommendedResult.output).not.toContain('noDerivedStateDeep');
   expect(plugins(dir)).toEqual([PRESET]);
 
   expect(init(project('2.5.15'), '--deep').output).toContain('needs Biome 2.6.0');

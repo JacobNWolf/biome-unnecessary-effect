@@ -45,6 +45,7 @@ const configPath =
 // Biome 2.6+ resolves the preset from the package manifest. Older versions need a path to each rule file,
 // relative to the config file.
 let entries = [`${PACKAGE}/presets/${deep ? 'deep' : 'recommended'}`];
+if (deep) console.log('Note: biome-ignore comments for noDerivedState must instead name noDerivedStateDeep.');
 if (!atLeast(biomeVersion, MANIFEST_BIOME)) {
   const packagePath = require.resolve
     .paths(PACKAGE)
