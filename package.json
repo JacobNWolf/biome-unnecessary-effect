@@ -1,6 +1,17 @@
 {
   "name": "@jacobwolf/biome-unnecessary-effect",
+  "description": "Biome plugin that detects unnecessary and misused React effect hooks.",
   "version": "0.1.1",
+  "license": "Beerware",
+  "author": "Jacob Wolf",
+  "homepage": "https://github.com/JacobNWolf/biome-unnecessary-effect#readme",
+  "bugs": {
+    "url": "https://github.com/JacobNWolf/biome-unnecessary-effect/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JacobNWolf/biome-unnecessary-effect.git"
+  },
   "private": false,
   "scripts": {
     "test": "bun test",
