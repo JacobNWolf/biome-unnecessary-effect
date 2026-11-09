@@ -24,7 +24,9 @@
   "files": [
     "biome-manifest.json",
     "grit/rules",
-    "scripts/init.js"
+    "scripts/init.js",
+    "ts/rules",
+    "ts/shared"
   ],
   "exports": {
     "biome": "./biome-manifest.json"
@@ -38,14 +40,17 @@
     "format:fix": "biome format --write",
     "lint": "biome lint",
     "lint:fix": "biome lint --write",
-    "sync:prelude": "node scripts/sync-prelude.js"
+    "sync:prelude": "node scripts/sync-prelude.js",
+    "typecheck": "tsc"
   },
   "peerDependencies": {
     "@biomejs/biome": ">=2.4.5"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
-    "@types/bun": "1.4.4"
+    "@types/bun": "1.4.4",
+    "@biomejs/runtime": "2.6.6",
+    "typescript": "7.0.2"
   },
   "packageManager": "bun@1.4.4"
 }

@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 
 const ROOT = join(import.meta.dir, '..');
 const BIOME_VERSION: string = JSON.parse(
@@ -9,8 +9,26 @@ const BIOME_VERSION: string = JSON.parse(
 ).version;
 const [major = 0, minor = 0] = BIOME_VERSION.split('.').map(Number);
 
-// Installs the packed tarball the way a consumer would and lints through the published manifest.
-test.skipIf(major === 2 && minor < 6)('published package works through the Biome manifest', () => {
+const COMPONENT = [
+  "import { useEffect, useState } from 'react';",
+  'export function Form({ first }: { first: string }) {',
+  "  const [full, setFull] = useState('');",
+  '  useEffect(() => {',
+  '    setFull(first);',
+  '  }, [first]);',
+  '  useEffect(() => {',
+  '    // biome-ignore lint/plugin/@jacobwolf/biome-unnecessary-effect/noDerivedState: suppression test',
+  '    setFull(first + "!");',
+  '  }, [first]);',
+  '  useEffect(() => {',
+  '    const update = setFull;',
+  '    update(first);',
+  '  }, [first]);',
+  '  return full;',
+  '}',
+].join('\n');
+
+const lintPacked = (preset: string) => {
   const dir = mkdtempSync(join(tmpdir(), 'bue-package-'));
   const pack = Bun.spawnSync(['npm', 'pack', '--silent', '--pack-destination', dir], { cwd: ROOT });
   const tarball = join(dir, pack.stdout.toString().trim());
@@ -20,25 +38,9 @@ test.skipIf(major === 2 && minor < 6)('published package works through the Biome
 
   writeFileSync(
     join(dir, 'biome.json'),
-    JSON.stringify({ plugins: ['@jacobwolf/biome-unnecessary-effect/presets/recommended'] }),
+    JSON.stringify({ plugins: [`@jacobwolf/biome-unnecessary-effect/presets/${preset}`] }),
   );
-  writeFileSync(
-    join(dir, 'component.tsx'),
-    [
-      "import { useEffect, useState } from 'react';",
-      'export function Form({ first }: { first: string }) {',
-      "  const [derived, setDerived] = useState('');",
-      '  useEffect(() => {',
-      '    setDerived(first);',
-      '  }, [first]);',
-      '  useEffect(() => {',
-      '    // biome-ignore lint/plugin/@jacobwolf/biome-unnecessary-effect/noDerivedState: suppression test',
-      '    setDerived(first + "!");',
-      '  }, [first]);',
-      '  return derived;',
-      '}',
-    ].join('\n'),
-  );
+  writeFileSync(join(dir, 'component.tsx'), COMPONENT);
 
   const { stdout } = Bun.spawnSync(
     [join(ROOT, 'node_modules', '.bin', 'biome'), 'lint', '--reporter=json', 'component.tsx'],
@@ -46,8 +48,18 @@ test.skipIf(major === 2 && minor < 6)('published package works through the Biome
   );
   const text = stdout.toString();
   const { diagnostics } = JSON.parse(text.slice(text.indexOf('{')));
-  const lines = diagnostics
+  return diagnostics
     .filter((d: { category: string }) => d.category === 'plugin')
     .map((d: { location: { start: { line: number } } }) => d.location.start.line);
-  expect(lines).toEqual([5]);
+};
+
+describe.skipIf(major === 2 && minor < 6)('published package', () => {
+  test('recommended preset loads the GritQL rules', () => {
+    expect(lintPacked('recommended')).toEqual([5]);
+  });
+
+  // The deep rule has its own suppression name, so line 9 is reported, and it follows the `update` alias on line 13.
+  test('deep preset loads the TypeScript rules', () => {
+    expect(lintPacked('deep')).toEqual([5, 9, 13]);
+  });
 });

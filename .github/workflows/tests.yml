@@ -6,17 +6,22 @@ on:
   pull_request:
     branches: [main]
 
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
 permissions:
   contents: read
 
 jobs:
   test:
+    if: github.event_name != 'schedule'
     name: Biome ${{ matrix.biome }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # Oldest supported, newest without manifests, and the locked version.
+        # Oldest supported, newest without manifests or TypeScript plugins, and the locked version.
         biome: ['2.4.5', '2.5.15', 'locked']
     steps:
       - uses: actions/checkout@v7
@@ -29,6 +34,17 @@ jobs:
         run: bun add --dev --no-save @biomejs/biome@${{ matrix.biome }}
 
       - if: matrix.biome == 'locked'
-        run: bun run lint && bun run format
+        run: bun run lint && bun run format && bun run typecheck
 
+      - run: bun test
+
+  latest-biome:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - run: bun install --frozen-lockfile
+      - run: bun add --dev --no-save @biomejs/biome@latest @biomejs/runtime@latest
+      - run: bun run typecheck
       - run: bun test

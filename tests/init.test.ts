@@ -22,8 +22,8 @@ const project = (biomeVersion: string | null, config?: { name: string; text: str
   return dir;
 };
 
-const init = (cwd: string) => {
-  const { exitCode, stdout, stderr } = Bun.spawnSync(['node', INIT, 'init'], { cwd });
+const init = (cwd: string, ...flags: string[]) => {
+  const { exitCode, stdout, stderr } = Bun.spawnSync(['node', INIT, 'init', ...flags], { cwd });
   return { exitCode, output: stdout.toString() + stderr.toString() };
 };
 
@@ -121,4 +121,16 @@ describe('init', () => {
     expect(init(project(null)).output).toContain('not installed');
     expect(init(project('2.4.4')).output).toContain('too old');
   });
+});
+
+test('switches to the deep preset with --deep on Biome 2.6+', () => {
+  const dir = project('2.6.6', { name: 'biome.json', text: JSON.stringify({ plugins: [PRESET] }) });
+
+  expect(init(dir, '--deep').exitCode).toBe(0);
+  expect(plugins(dir)).toEqual(['@jacobwolf/biome-unnecessary-effect/presets/deep']);
+
+  expect(init(dir).exitCode).toBe(0);
+  expect(plugins(dir)).toEqual([PRESET]);
+
+  expect(init(project('2.5.15'), '--deep').output).toContain('needs Biome 2.6.0');
 });
