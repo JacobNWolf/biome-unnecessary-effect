@@ -2,11 +2,14 @@ name: Publish to npm
 
 on:
   release:
-    types: [created]
+    types: [published]
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -14,16 +17,19 @@ jobs:
       - name: Set up tools
         uses: jdx/mise-action@v5
 
+      - name: Check the release tag matches package.json
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "Release tag $GITHUB_REF_NAME doesn't match package.json version $version" >&2
+            exit 1
+          fi
+
       - name: Install dependencies
-        run: bun install --ignore-scripts
+        run: bun install --frozen-lockfile --ignore-scripts
 
-      - name: Build plugin binaries
-        run: bun run build:plugin
-
-      - name: Configure npm authentication
-        run: npm config set '//registry.npmjs.org/:_authToken' '${NODE_AUTH_TOKEN}'
+      - name: Run tests
+        run: bun test
 
       - name: Publish package to npm
-        run: npm publish --access public --registry https://registry.npmjs.org
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public ${{ github.event.release.prerelease && '--tag next' || '' }}
