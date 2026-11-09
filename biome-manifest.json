@@ -13,6 +13,9 @@
         "noDerivedState": "./grit/rules/noDerivedState.grit"
       },
       {
+        "noEffectEventOutsideEffect": "./grit/rules/noEffectEventOutsideEffect.grit"
+      },
+      {
         "noEmptyEffect": "./grit/rules/noEmptyEffect.grit"
       },
       {
@@ -34,7 +37,13 @@
         "noPassLiveStateToParent": "./grit/rules/noPassLiveStateToParent.grit"
       },
       {
+        "noPassingEffectEvent": "./grit/rules/noPassingEffectEvent.grit"
+      },
+      {
         "noResetAllStateOnPropChange": "./grit/rules/noResetAllStateOnPropChange.grit"
+      },
+      {
+        "preferUseEffectEvent": "./grit/rules/preferUseEffectEvent.grit"
       }
     ],
     "presets": {
@@ -42,6 +51,7 @@
         "noAdjustStateOnPropChange",
         "noChainStateUpdates",
         "noDerivedState",
+        "noEffectEventOutsideEffect",
         "noEmptyEffect",
         "noEventHandler",
         "noExternalStoreSubscription",
@@ -49,8 +59,10 @@
         "noInitializeState",
         "noPassDataToParent",
         "noPassLiveStateToParent",
+        "noPassingEffectEvent",
         "noResetAllStateOnPropChange"
-      ]
+      ],
+      "react19": ["preferUseEffectEvent"]
     }
   }
 }

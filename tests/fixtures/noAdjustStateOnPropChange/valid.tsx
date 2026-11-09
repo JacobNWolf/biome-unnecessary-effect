@@ -17,7 +17,7 @@ export function EventHandler({ items }: { items: string[] }) {
 export function RefOnly({ items }: { items: string[] }) {
   const previous = useRef(items);
   useLayoutEffect(() => {
-    previous.current = items;
+    previous.current = items; // expect: preferUseEffectEvent
   }, [items]);
   return previous.current.length;
 }

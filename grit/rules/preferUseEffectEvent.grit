@@ -1,0 +1,210 @@
+language js
+
+// prelude:start: generated from grit/prelude.grit by `bun run sync:prelude`; do not edit here
+// Import resolution makes checks 15-100x slower, so renamed hooks require the deep preset.
+pattern effect_hook() {
+  or {
+    `useEffect`,
+    `React.useEffect`,
+    `useDeepCompareEffect`,
+    `useCustomCompareEffect`,
+    `useShallowEffect`
+  }
+}
+
+pattern mount_hook() {
+  or {
+    `useMount`,
+    `useEffectOnce`,
+    `useMountEffect`
+  }
+}
+
+pattern layout_hook() {
+  or {
+    `useLayoutEffect`,
+    `React.useLayoutEffect`,
+    `useInsertionEffect`,
+    `React.useInsertionEffect`
+  }
+}
+
+pattern effect_event_hook() {
+  or {
+    `useEffectEvent`,
+    `React.useEffectEvent`
+  }
+}
+
+pattern function_node() {
+  or {
+    JsArrowFunctionExpression(),
+    JsFunctionExpression(),
+    JsFunctionDeclaration(),
+    JsMethodObjectMember()
+  }
+}
+
+pattern sync_callback($body) {
+  and { not `async () => $_`,
+  not `async function () { $_ }`,
+  or {
+    `() => $body`,
+    `function () { $body }`
+  } }
+}
+
+pattern state_declaration($state, $setter, $init) {
+  or {
+    `const [$state, $setter] = useState($init)`,
+    `const [$state, $setter] = useState<$_>($init)`,
+    `const [$state, $setter] = React.useState($init)`,
+    `const [$state, $setter] = React.useState<$_>($init)`
+  }
+}
+
+// GritQL has no lookup cache; component-scoped searches avoid repeated file-wide walks.
+pattern state_setter($scope, $state, $setter) {
+  $setter where {
+    $setter <: r"[A-Za-z_$][A-Za-z0-9_$]*",
+    $scope <: contains `const [$state, $setter] = $init` where {
+      $init <: or {
+        `useState($_)`,
+        `useState<$_>($_)`,
+        `React.useState($_)`,
+        `React.useState<$_>($_)`
+      }
+    } until function_node()
+  }
+}
+
+// Tracing follows one hop through component/effect locals, excluding other nested functions.
+pattern state_reference($scope, $local, $ref) {
+  $ref where {
+    $ref <: r"[A-Za-z_$][A-Za-z0-9_$]*",
+    or {
+      $scope <: contains or {
+        `const [$ref, $_] = $init`,
+        `const [$ref] = $init`
+      } where {
+        $init <: or {
+          `useState($_)`,
+          `useState<$_>($_)`,
+          `React.useState($_)`,
+          `React.useState<$_>($_)`
+        }
+      } until function_node(),
+      and {
+        or {
+          $local <: contains or {
+            `const $ref = $value`,
+            `function $ref() { $value }`
+          } until function_node(),
+          $scope <: contains or {
+            `const $ref = $value`,
+            `function $ref() { $value }`
+          } until function_node()
+        },
+        $value <: contains $source where {
+          $source <: r"[A-Za-z_$][A-Za-z0-9_$]*",
+          $scope <: contains or {
+            `const [$source, $_] = $sourceInit`,
+            `const [$source] = $sourceInit`
+          } where {
+            $sourceInit <: or {
+              `useState($_)`,
+              `useState<$_>($_)`,
+              `React.useState($_)`,
+              `React.useState<$_>($_)`
+            }
+          } until function_node()
+        }
+      }
+    }
+  }
+}
+
+// Parent callback checks skip one-hop tracing to keep per-call lookups cheap.
+pattern prop_or_context($scope, $params, $ref) {
+  $ref where {
+    $ref <: r"[A-Za-z_$][A-Za-z0-9_$]*",
+    or {
+      $params <: contains $ref,
+      $scope <: contains `const $binding = $context` where {
+        $context <: or {
+          `useContext($_)`,
+          `React.useContext($_)`
+        },
+        $binding <: or {
+          $ref,
+          `{ $fields }` where { $fields <: contains $ref }
+        }
+      } until function_node()
+    }
+  }
+}
+
+// One-hop tracing follows props only; context values must be referenced directly.
+pattern prop_reference($scope, $local, $params, $ref) {
+  $ref where {
+    $ref <: r"[A-Za-z_$][A-Za-z0-9_$]*",
+    or {
+      $params <: contains $ref,
+      $scope <: contains `const $binding = $context` where {
+        $context <: or {
+          `useContext($_)`,
+          `React.useContext($_)`
+        },
+        $binding <: or {
+          $ref,
+          `{ $fields }` where { $fields <: contains $ref }
+        }
+      } until function_node(),
+      and {
+        or {
+          $local <: contains `const $ref = $value` until function_node(),
+          $scope <: contains `const $ref = $value` until function_node()
+        },
+        $value <: contains $source where { $source <: r"[A-Za-z_$][A-Za-z0-9_$]*", $params <: contains $source }
+      }
+    }
+  }
+}
+
+// Bare `return;` exits early and must not count as cleanup.
+pattern cleanup_return() { `return $value` where { $value <: r"[\s\S]+" } }
+
+pattern enclosing_function($name, $params, $body) {
+  or {
+    `function $name($params) { $body }`,
+    `const $name = ($params) => $body`,
+    `const $name = function ($params) { $body }`,
+    `const $name = $_(($params) => $body)`,
+    `const $name = $_(function ($params) { $body })`,
+    `const $name = $_(function $_($params) { $body })`
+  } where { $name <: r"[A-Z][A-Za-z0-9_]*|use[A-Z][A-Za-z0-9_]*" }
+}
+// prelude:end
+
+`$ref.current = $value` as $assignment where {
+  $program <: contains or {
+    `const $ref = useRef($_)`,
+    `const $ref = React.useRef($_)`
+  },
+  $assignment <: within or {
+    `$hook($cb, $deps)`,
+    `$hook($cb)`
+  } where {
+    $hook <: or {
+      effect_hook(),
+      layout_hook()
+    }
+  },
+  $cb <: `() => { $body }`,
+  $body <: not contains or {
+    JsCallExpression(),
+    JsIfStatement(),
+    JsReturnStatement()
+  },
+  register_diagnostic(span=$assignment, message=`This effect only copies "$value" into "$ref" so other code can read the latest value. On React 19.2+, read "$value" inside a useEffectEvent function instead. See https://react.dev/reference/react/useEffectEvent`, severity="info")
+}
