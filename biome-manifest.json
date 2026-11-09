@@ -7,6 +7,9 @@
         "noAdjustStateOnPropChange": "./grit/rules/noAdjustStateOnPropChange.grit"
       },
       {
+        "noAsyncEffectCallback": "./grit/rules/noAsyncEffectCallback.grit"
+      },
+      {
         "noChainStateUpdates": "./grit/rules/noChainStateUpdates.grit"
       },
       {
@@ -43,12 +46,16 @@
         "noResetAllStateOnPropChange": "./grit/rules/noResetAllStateOnPropChange.grit"
       },
       {
+        "noSetStateInEffectWithoutDeps": "./grit/rules/noSetStateInEffectWithoutDeps.grit"
+      },
+      {
         "preferUseEffectEvent": "./grit/rules/preferUseEffectEvent.grit"
       }
     ],
     "presets": {
       "recommended": [
         "noAdjustStateOnPropChange",
+        "noAsyncEffectCallback",
         "noChainStateUpdates",
         "noDerivedState",
         "noEffectEventOutsideEffect",
@@ -60,7 +67,8 @@
         "noPassDataToParent",
         "noPassLiveStateToParent",
         "noPassingEffectEvent",
-        "noResetAllStateOnPropChange"
+        "noResetAllStateOnPropChange",
+        "noSetStateInEffectWithoutDeps"
       ],
       "react19": ["preferUseEffectEvent"]
     }
