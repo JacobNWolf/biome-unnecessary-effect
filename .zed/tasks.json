@@ -1,0 +1,30 @@
+[
+  {
+    "label": "Bun: run test at cursor",
+    "command": "mise exec -- bun test \"$ZED_FILE\" --test-name-pattern \"${ZED_CUSTOM_TYPESCRIPT_BUN_TEST_NAME}\"",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "tags": ["js-test", "ts-test", "bun-test", "tsx-test"],
+    "use_new_terminal": false,
+    "reveal": "always",
+    "show_summary": true,
+    "show_command": true
+  },
+  {
+    "label": "Bun: run tests in file",
+    "command": "mise exec -- bun test \"$ZED_FILE\"",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "reveal": "always",
+    "show_summary": true,
+    "show_command": true
+  },
+  {
+    "label": "Bun: run all tests",
+    "command": "mise exec -- bun test",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": true,
+    "reveal": "always",
+    "show_summary": true,
+    "show_command": true
+  }
+]
