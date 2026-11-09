@@ -1,0 +1,66 @@
+language js
+
+any {
+  `useEffect($body, $_)` as $effect where {
+    $body <: contains or {
+      `fetch($_)`,
+      `fetch()`,
+      `axios($_)`,
+      `axios()`,
+      `axios.$method($_)`,
+      `axios.$method()`,
+      `$client.get($_)`,
+      `$client.get()`,
+      `$client.post($_)`,
+      `$client.post()`,
+      `$client.put($_)`,
+      `$client.put()`,
+      `$client.delete($_)`,
+      `$client.delete()`,
+      `$client.patch($_)`,
+      `$client.patch()`,
+      `$client.request($_)`,
+      `$client.request()`,
+      `$.ajax($_)`,
+      `$.ajax()`,
+      `$.get($_)`,
+      `$.get()`,
+      `$.post($_)`,
+      `$.post()`,
+      `api.$method($_)`,
+      `api.$method()`
+    },
+    register_diagnostic(span=$effect, message="Avoid fetching data directly in useEffect. Consider using a data fetching library like React/TanStack Query or SWR for better error handling, caching, and loading states.", severity="warn")
+  },
+  `useLayoutEffect($body, $_)` as $effect where {
+    $body <: contains or {
+      `fetch($_)`,
+      `fetch()`,
+      `axios($_)`,
+      `axios()`,
+      `axios.$method($_)`,
+      `axios.$method()`,
+      `$client.get($_)`,
+      `$client.get()`,
+      `$client.post($_)`,
+      `$client.post()`,
+      `$client.put($_)`,
+      `$client.put()`,
+      `$client.delete($_)`,
+      `$client.delete()`,
+      `$client.patch($_)`,
+      `$client.patch()`,
+      `$client.request($_)`,
+      `$client.request()`,
+      `$.ajax($_)`,
+      `$.ajax()`,
+      `$.get($_)`,
+      `$.get()`,
+      `$.post($_)`,
+      `$.post()`,
+      `api.$method($_)`,
+      `api.$method()`
+    },
+    register_diagnostic(span=$effect, message="Avoid fetching data directly in useLayoutEffect. Consider using a data fetching library like React/TanStack Query or SWR for better error handling, caching, and loading states.", severity="warn")
+  }
+}

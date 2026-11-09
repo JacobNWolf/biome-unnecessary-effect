@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 export function InitializingStateComponent() {
   const [name, setName] = useState('');
 
-  useEffect(() => {
+  useEffect(() => { // expect: noInitializeState
     setName('test');
   }, []);
 

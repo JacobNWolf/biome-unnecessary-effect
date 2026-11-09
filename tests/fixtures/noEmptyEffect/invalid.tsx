@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
 
 export function EmptyEffectComponent() {
-  // biome-ignore lint: This comment should suppress the empty effect warning
-  useEffect(() => {}, []);
+  useEffect(() => {}, []); // expect: noEmptyEffect
 
   return <div>Empty Effect</div>;
 }

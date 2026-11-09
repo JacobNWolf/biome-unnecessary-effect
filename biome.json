@@ -32,7 +32,8 @@
       "**/*.jsx",
       "**/*.json",
       "**/*.md",
-      "**/*.grit"
+      "**/*.grit",
+      "!tests/fixtures"
     ]
   },
   "formatter": {
@@ -66,7 +67,6 @@
     },
     "jsxRuntime": "transparent"
   },
-  "plugins": ["./grit/react-effects.grit"],
   "vcs": {
     "clientKind": "git",
     "enabled": false,

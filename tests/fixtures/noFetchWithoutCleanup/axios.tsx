@@ -6,7 +6,7 @@ export function AxiosDataFetchingComponent({ id }: { id: number }) {
   const [data, setData] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  useEffect(() => { // expect: noFetchWithoutCleanup
     let ignore = false;
 
     async function fetchData() {

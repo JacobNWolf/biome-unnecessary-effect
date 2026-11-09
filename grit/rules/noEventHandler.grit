@@ -1,0 +1,24 @@
+language js
+
+any {
+  `useEffect($body, [$deps])` as $effect where {
+    $deps <: not undefined,
+    $body <: contains `if ($condition) { $ifBody }`,
+    $condition <: not contains `!ignore`,
+    $condition <: not contains `error`,
+    $body <: not contains `return $cleanup`,
+    $body <: not contains `return () =>`,
+    $body <: not contains `return function`,
+    register_diagnostic(span=$effect, message="Avoid using state as an event handler. Instead, call the event handler directly.")
+  },
+  `useLayoutEffect($body, [$deps])` as $effect where {
+    $deps <: not undefined,
+    $body <: contains `if ($condition) { $ifBody }`,
+    $condition <: not contains `!ignore`,
+    $condition <: not contains `error`,
+    $body <: not contains `return $cleanup`,
+    $body <: not contains `return () =>`,
+    $body <: not contains `return function`,
+    register_diagnostic(span=$effect, message="Avoid using state as an event handler. Instead, call the event handler directly.")
+  }
+}

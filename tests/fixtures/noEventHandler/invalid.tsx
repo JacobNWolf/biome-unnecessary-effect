@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 export function EventHandlerEffectComponent() {
   const [shouldFire, setShouldFire] = useState(false);
 
-  useEffect(() => {
+  useEffect(() => { // expect: noEventHandler
     if (shouldFire) {
       console.log('fired');
     }

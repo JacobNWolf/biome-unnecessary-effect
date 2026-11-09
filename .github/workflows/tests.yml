@@ -1,26 +1,34 @@
-name: Run Tests
+name: Tests
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   test:
+    name: Biome ${{ matrix.biome }}
     runs-on: ubuntu-latest
-
+    strategy:
+      fail-fast: false
+      matrix:
+        # Oldest supported, newest without manifests, and the locked version.
+        biome: ['2.4.5', '2.5.15', 'locked']
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
 
-      - name: Setup Bun
-        uses: jdx/mise-action@v5
+      - uses: jdx/mise-action@v5
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun install --frozen-lockfile --ignore-scripts
 
-      - name: Run tests
-        run: bun test
+      - if: matrix.biome != 'locked'
+        run: bun add --dev --no-save --ignore-scripts @biomejs/biome@${{ matrix.biome }}
+
+      - if: matrix.biome == 'locked'
+        run: bun run lint && bun run format
+
+      - run: bun test
