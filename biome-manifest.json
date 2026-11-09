@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/manifest_schema.json",
+  "version": 1,
+  "plugins": {
+    "rules": [
+      {
+        "noDerivedState": "./grit/rules/noDerivedState.grit"
+      },
+      {
+        "noEmptyEffect": "./grit/rules/noEmptyEffect.grit"
+      },
+      {
+        "noEventHandler": "./grit/rules/noEventHandler.grit"
+      },
+      {
+        "noFetchWithoutCleanup": "./grit/rules/noFetchWithoutCleanup.grit"
+      },
+      {
+        "noInitializeState": "./grit/rules/noInitializeState.grit"
+      },
+      {
+        "noPassLiveStateToParent": "./grit/rules/noPassLiveStateToParent.grit"
+      }
+    ],
+    "presets": {
+      "recommended": [
+        "noDerivedState",
+        "noEmptyEffect",
+        "noEventHandler",
+        "noFetchWithoutCleanup",
+        "noInitializeState",
+        "noPassLiveStateToParent"
+      ]
+    }
+  }
+}

@@ -1,9 +1,15 @@
 {
   "name": "@jacobwolf/biome-unnecessary-effect",
-  "description": "Biome plugin that detects unnecessary and misused React effect hooks.",
-  "version": "0.1.1",
-  "license": "Beerware",
-  "author": "Jacob Wolf",
+  "version": "0.2.0",
+  "description": "Biome plugin that flags unnecessary and misused React effects.",
+  "keywords": [
+    "biome",
+    "biome-plugin",
+    "gritql",
+    "react",
+    "react-hooks",
+    "useeffect"
+  ],
   "homepage": "https://github.com/JacobNWolf/biome-unnecessary-effect#readme",
   "bugs": {
     "url": "https://github.com/JacobNWolf/biome-unnecessary-effect/issues"
@@ -12,30 +18,33 @@
     "type": "git",
     "url": "git+https://github.com/JacobNWolf/biome-unnecessary-effect.git"
   },
-  "private": false,
+  "license": "Beerware",
+  "author": "Jacob Wolf",
+  "type": "module",
+  "files": [
+    "biome-manifest.json",
+    "grit/rules",
+    "scripts/init.js"
+  ],
+  "exports": {
+    "biome": "./biome-manifest.json"
+  },
+  "bin": {
+    "biome-unnecessary-effect": "scripts/init.js"
+  },
   "scripts": {
     "test": "bun test",
     "format": "biome format",
     "format:fix": "biome format --write",
     "lint": "biome lint",
-    "lint:fix": "biome lint --write",
-    "build:plugin": "sh scripts/build.sh",
-    "prepublishOnly": "bun run build:plugin",
-    "postinstall": "node scripts/postinstall.js"
+    "lint:fix": "biome lint --write"
   },
-  "files": [
-    "grit",
-    "scripts/postinstall.js",
-    "bin",
-    "LICENSE",
-    "README.md"
-  ],
-  "keywords": [
-    "biome-plugin"
-  ],
-  "packageManager": "bun@1.4.4",
+  "peerDependencies": {
+    "@biomejs/biome": ">=2.4.5"
+  },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
     "@types/bun": "1.4.4"
-  }
+  },
+  "packageManager": "bun@1.4.4"
 }

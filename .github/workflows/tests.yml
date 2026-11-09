@@ -23,10 +23,10 @@ jobs:
 
       - uses: jdx/mise-action@v5
 
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun install --frozen-lockfile
 
       - if: matrix.biome != 'locked'
-        run: bun add --dev --no-save --ignore-scripts @biomejs/biome@${{ matrix.biome }}
+        run: bun add --dev --no-save @biomejs/biome@${{ matrix.biome }}
 
       - if: matrix.biome == 'locked'
         run: bun run lint && bun run format
