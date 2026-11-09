@@ -23,9 +23,15 @@ yarn add -D biome-unnecessary-effect
 
 ## Usage
 
-To use this plugin, you must have Biome 2.0+ installed. You can do so and configure Biome according to [their documentation](https://biomejs.dev/guides/getting-started). Plugins are not supported in Biome versions prior to 2.0.
+To use this plugin, you must have Biome 2.4.5+ installed. You can do so and configure Biome according to [their documentation](https://biomejs.dev/guides/getting-started). Plugins are not supported in Biome versions prior to 2.0.
 
-After installation, the plugin will automatically configure your `biome.json` file, adding the respective plugin rule. No manual setup is required!
+After installation, run the initializer from your project directory to configure `biome.json` or `biome.jsonc`:
+
+```bash
+npx @jacobwolf/biome-unnecessary-effect init
+```
+
+If the initializer cannot parse your Biome configuration, follow the manual instructions it prints to add the plugin entries yourself.
 
 Then, you can run Biome:
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 
 const PACKAGE = '@jacobwolf/biome-unnecessary-effect';
 const MIN_BIOME = '2.4.5';
@@ -22,9 +22,10 @@ const atLeast = (version, min) => {
 if (process.argv[2] !== 'init') fail(`unknown command. Usage: npx ${PACKAGE} init`);
 
 const cwd = process.cwd();
+const require = createRequire(join(cwd, 'package.json'));
 let biomeVersion;
 try {
-  biomeVersion = createRequire(join(cwd, 'package.json'))('@biomejs/biome/package.json').version;
+  biomeVersion = require('@biomejs/biome/package.json').version;
 } catch {
   fail('@biomejs/biome is not installed in this project. Install it first, e.g. `npm install -D @biomejs/biome`.');
 }
@@ -37,12 +38,16 @@ const configPath =
 
 // Biome 2.6+ resolves the preset from the package manifest. Older versions need a path to each rule file,
 // relative to the config file.
-const packageDir = relative(cwd, join(cwd, 'node_modules', PACKAGE))
-  .split('\\')
-  .join('/');
-const entries = atLeast(biomeVersion, MANIFEST_BIOME)
-  ? [`${PACKAGE}/presets/recommended`]
-  : manifest.plugins.presets.recommended.map((rule) => `./${packageDir}/grit/rules/${rule}.grit`);
+let entries = [`${PACKAGE}/presets/recommended`];
+if (!atLeast(biomeVersion, MANIFEST_BIOME)) {
+  const packagePath = require.resolve
+    .paths(PACKAGE)
+    .map((path) => join(path, PACKAGE))
+    .find(existsSync);
+  if (!packagePath) fail(`${PACKAGE} is not installed in this project. Install it first.`);
+  const packageDir = relative(dirname(configPath), packagePath).split('\\').join('/');
+  entries = manifest.plugins.presets.recommended.map((rule) => `./${packageDir}/grit/rules/${rule}.grit`);
+}
 
 const text = existsSync(configPath) ? readFileSync(configPath, 'utf8') : '{}\n';
 let config;
@@ -57,7 +62,17 @@ try {
 if (config.plugins !== undefined && !Array.isArray(config.plugins))
   fail('"plugins" in your Biome config is not an array.');
 
-const isOurs = (entry) => (typeof entry === 'string' ? entry : (entry?.path ?? '')).includes(PACKAGE);
+const isOurs = (entry) => {
+  const path = typeof entry === 'string' ? entry : entry?.path;
+  if (typeof path !== 'string') return false;
+  const normalized = path.replaceAll('\\', '/');
+  const packagePath = `node_modules/${PACKAGE}/`;
+  return (
+    normalized === `${PACKAGE}/presets/recommended` ||
+    normalized.startsWith(packagePath) ||
+    normalized.includes(`/${packagePath}`)
+  );
+};
 const kept = (config.plugins ?? []).filter((entry) => !isOurs(entry));
 const plugins = [...kept, ...entries];
 

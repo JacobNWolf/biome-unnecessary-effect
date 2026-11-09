@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
@@ -11,6 +11,7 @@ const project = (biomeVersion: string | null, config?: { name: string; text: str
   const dir = mkdtempSync(join(tmpdir(), 'bue-init-'));
   writeFileSync(join(dir, 'package.json'), '{}');
   if (biomeVersion) {
+    mkdirSync(join(dir, 'node_modules', '@jacobwolf', 'biome-unnecessary-effect'), { recursive: true });
     mkdirSync(join(dir, 'node_modules', '@biomejs', 'biome'), { recursive: true });
     writeFileSync(
       join(dir, 'node_modules', '@biomejs', 'biome', 'package.json'),
@@ -53,6 +54,52 @@ describe('init', () => {
     expect(init(dir).exitCode).toBe(0);
     expect(init(dir).output).toContain('already configured');
     expect(plugins(dir)).toEqual(['./mine.grit', PRESET]);
+  });
+
+  test('preserves user-owned paths containing the package name', () => {
+    const unrelated = [
+      './custom/@jacobwolf/biome-unnecessary-effect/rule.grit',
+      './node_modules/@jacobwolf/biome-unnecessary-effect-custom/rule.grit',
+      `${PRESET}-custom`,
+      { path: './custom/@jacobwolf/biome-unnecessary-effect/rule.grit' },
+    ];
+    const dir = project('2.6.6', {
+      name: 'biome.json',
+      text: JSON.stringify({
+        plugins: [
+          ...unrelated,
+          LEGACY_ENTRY,
+          { path: `../../${LEGACY_ENTRY}` },
+          { path: LEGACY_ENTRY.replaceAll('/', '\\') },
+          PRESET,
+        ],
+      }),
+    });
+    expect(init(dir).exitCode).toBe(0);
+    expect(plugins(dir)).toEqual([...unrelated, PRESET]);
+  });
+
+  test.each(['2.4.5', '2.5.15'])('finds hoisted rule paths on Biome %s', (version) => {
+    const root = project(version);
+    const dir = join(root, 'packages', 'app');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'package.json'), '{}');
+    writeFileSync(join(dir, 'biome.jsonc'), '{}');
+    expect(init(dir).exitCode).toBe(0);
+    expect(plugins(dir, 'biome.jsonc')).toContain(
+      './../../node_modules/@jacobwolf/biome-unnecessary-effect/grit/rules/noDerivedState.grit',
+    );
+    expect(init(dir).output).toContain('already configured');
+  });
+
+  test('leaves the config untouched when the legacy rule package is missing', () => {
+    const text = '{ "plugins": ["./mine.grit"] }\n';
+    const dir = project('2.5.15', { name: 'biome.json', text });
+    rmSync(join(dir, 'node_modules', '@jacobwolf', 'biome-unnecessary-effect'), { recursive: true });
+    const { exitCode, output } = init(dir);
+    expect(exitCode).toBe(1);
+    expect(output).toContain('@jacobwolf/biome-unnecessary-effect is not installed');
+    expect(readFileSync(join(dir, 'biome.json'), 'utf8')).toBe(text);
   });
 
   test('creates biome.json when there is no config', () => {
