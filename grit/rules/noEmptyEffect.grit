@@ -185,12 +185,18 @@ pattern enclosing_function($name, $params, $body) {
   } where { $name <: r"[A-Z][A-Za-z0-9_]*|use[A-Z][A-Za-z0-9_]*" }
 }
 // prelude:end
-
-any {
-  `useEffect(() => {}, $_)` as $effect where {
-    register_diagnostic(span=$effect, message="This effect is empty and could be removed.")
+or {
+  `$hook($cb, $deps)`,
+  `$hook($cb)`
+} as $effect where {
+  $hook <: or {
+    effect_hook(),
+    mount_hook(),
+    layout_hook()
   },
-  `useLayoutEffect(() => {}, $_)` as $effect where {
-    register_diagnostic(span=$effect, message="This effect is empty and could be removed.")
-  }
+  $cb <: or {
+    `() => {}`,
+    `function () {}`
+  },
+  register_diagnostic(span=$effect, message="This effect is empty and can be removed.", severity="warn")
 }
