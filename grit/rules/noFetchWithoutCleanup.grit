@@ -185,68 +185,19 @@ pattern enclosing_function($name, $params, $body) {
   } where { $name <: r"[A-Z][A-Za-z0-9_]*|use[A-Z][A-Za-z0-9_]*" }
 }
 // prelude:end
-
-any {
-  `useEffect($body, $_)` as $effect where {
-    $body <: contains or {
-      `fetch($_)`,
-      `fetch()`,
-      `axios($_)`,
-      `axios()`,
-      `axios.$method($_)`,
-      `axios.$method()`,
-      `$client.get($_)`,
-      `$client.get()`,
-      `$client.post($_)`,
-      `$client.post()`,
-      `$client.put($_)`,
-      `$client.put()`,
-      `$client.delete($_)`,
-      `$client.delete()`,
-      `$client.patch($_)`,
-      `$client.patch()`,
-      `$client.request($_)`,
-      `$client.request()`,
-      `$.ajax($_)`,
-      `$.ajax()`,
-      `$.get($_)`,
-      `$.get()`,
-      `$.post($_)`,
-      `$.post()`,
-      `api.$method($_)`,
-      `api.$method()`
-    },
-    register_diagnostic(span=$effect, message="Avoid fetching data directly in useEffect. Consider using a data fetching library like React/TanStack Query or SWR for better error handling, caching, and loading states.", severity="warn")
+`$hook($cb, $deps)` where {
+  $hook <: or {
+    effect_hook(),
+    layout_hook()
   },
-  `useLayoutEffect($body, $_)` as $effect where {
-    $body <: contains or {
-      `fetch($_)`,
-      `fetch()`,
-      `axios($_)`,
-      `axios()`,
-      `axios.$method($_)`,
-      `axios.$method()`,
-      `$client.get($_)`,
-      `$client.get()`,
-      `$client.post($_)`,
-      `$client.post()`,
-      `$client.put($_)`,
-      `$client.put()`,
-      `$client.delete($_)`,
-      `$client.delete()`,
-      `$client.patch($_)`,
-      `$client.patch()`,
-      `$client.request($_)`,
-      `$client.request()`,
-      `$.ajax($_)`,
-      `$.ajax()`,
-      `$.get($_)`,
-      `$.get()`,
-      `$.post($_)`,
-      `$.post()`,
-      `api.$method($_)`,
-      `api.$method()`
-    },
-    register_diagnostic(span=$effect, message="Avoid fetching data directly in useLayoutEffect. Consider using a data fetching library like React/TanStack Query or SWR for better error handling, caching, and loading states.", severity="warn")
-  }
+  $cb <: sync_callback($body),
+  $body <: contains or {
+    `fetch($_)`,
+    `axios($_)`,
+    `axios.$_($_)`,
+    `ky($_)`,
+    `ky.$_($_)`
+  } as $request,
+  $body <: not contains cleanup_return() until function_node(),
+  register_diagnostic(span=$request, message="This request has no cleanup, so a slower, older response can overwrite a newer one. Return a cleanup that aborts the request or ignores its result, or use a data-fetching library. See https://react.dev/learn/you-might-not-need-an-effect#fetching-data", severity="warn")
 }

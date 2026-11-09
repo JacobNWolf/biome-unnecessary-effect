@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 
-export function EmptyEffectComponent() {
+export function EmptyEffects() {
   useEffect(() => {}, []); // expect: noEmptyEffect
-
-  return <div>Empty Effect</div>;
+  useEffect(() => {}); // expect: noEmptyEffect
+  useEffect(function () {}, []); // expect: noEmptyEffect
+  useLayoutEffect(() => {}, []); // expect: noEmptyEffect
+  return null;
 }

@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
 
-export function EmptyEffectComponent() {
-  // biome-ignore lint/plugin/noEmptyEffect: This comment should suppress the empty effect warning
+export function Suppressed() {
+  // biome-ignore lint/plugin/noEmptyEffect: placeholder kept on purpose
   useEffect(() => {}, []);
-
-  return <div>Empty Effect</div>;
+  return null;
 }

@@ -1,33 +1,18 @@
 import { useEffect, useState } from 'react';
 
-export function DataFetchingComponent({ id }: { id: number }) {
-  const [data, setData] = useState<unknown>(null);
-  const [loading, setLoading] = useState(false);
+import axios from 'axios';
 
-  useEffect(() => { // expect: noFetchWithoutCleanup
-    let ignore = false;
-
-    async function fetchData() {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/data?id=${id}`);
-        const json = await response.json();
-        if (!ignore) {
-          setData(json);
-        }
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
-      }
+export function SearchResults({ query }: { query: string }) {
+  const [results, setResults] = useState<unknown>(null);
+  useEffect(() => {
+    fetch(`/search?q=${query}`).then((response) => response.json()).then(setResults); // expect: noFetchWithoutCleanup
+  }, [query]);
+  useEffect(() => {
+    async function load() {
+      const response = await axios.get(`/search?q=${query}`); // expect: noFetchWithoutCleanup
+      setResults(response.data);
     }
-
-    fetchData();
-
-    return () => {
-      ignore = true;
-    };
-  }, [id]);
-
-  return <div>{loading ? 'Loading...' : JSON.stringify(data)}</div>;
+    load();
+  }, [query]);
+  return results;
 }

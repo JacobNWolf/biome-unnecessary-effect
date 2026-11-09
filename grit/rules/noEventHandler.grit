@@ -185,26 +185,25 @@ pattern enclosing_function($name, $params, $body) {
   } where { $name <: r"[A-Z][A-Za-z0-9_]*|use[A-Z][A-Za-z0-9_]*" }
 }
 // prelude:end
-
-any {
-  `useEffect($body, [$deps])` as $effect where {
-    $deps <: not undefined,
-    $body <: contains `if ($condition) { $ifBody }`,
-    $condition <: not contains `!ignore`,
-    $condition <: not contains `error`,
-    $body <: not contains `return $cleanup`,
-    $body <: not contains `return () =>`,
-    $body <: not contains `return function`,
-    register_diagnostic(span=$effect, message="Avoid using state as an event handler. Instead, call the event handler directly.")
+or {
+  `if ($test) { $_ }`,
+  `if ($test) return;`
+} as $if where {
+  $if <: not contains JsElseClause() until JsBlockStatement(),
+  $if <: within `$hook($cb, $deps)` where { $hook <: effect_hook() },
+  $cb <: sync_callback($body),
+  $body <: contains $if until function_node(),
+  $body <: not contains cleanup_return() until function_node(),
+  $if <: within enclosing_function($unused1, $params, $component),
+  or {
+    and {
+      $test <: contains state_reference($component, $body, $ref),
+      $message = `Avoid using state and an effect as an event handler. Run the code that depends on "$ref" from the event handler that sets it instead. See https://react.dev/learn/you-might-not-need-an-effect#sharing-logic-between-event-handlers`
+    },
+    and {
+      $test <: contains prop_reference($component, $body, $params, $ref),
+      $message = `Avoid using props and an effect as an event handler. Move the code that depends on "$ref" to the parent's event handler instead. See https://react.dev/learn/you-might-not-need-an-effect#sharing-logic-between-event-handlers`
+    }
   },
-  `useLayoutEffect($body, [$deps])` as $effect where {
-    $deps <: not undefined,
-    $body <: contains `if ($condition) { $ifBody }`,
-    $condition <: not contains `!ignore`,
-    $condition <: not contains `error`,
-    $body <: not contains `return $cleanup`,
-    $body <: not contains `return () =>`,
-    $body <: not contains `return function`,
-    register_diagnostic(span=$effect, message="Avoid using state as an event handler. Instead, call the event handler directly.")
-  }
+  register_diagnostic(span=$test, message=$message, severity="warn")
 }
