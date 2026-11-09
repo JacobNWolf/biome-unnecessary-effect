@@ -1,7 +1,6 @@
 import { resolve } from 'node:path';
+import { describe, expect, test } from 'bun:test';
 import { spawnSync } from 'bun';
-
-import { describe, expect, test } from 'vitest';
 
 const FIXTURES_PATH = resolve(import.meta.dir, 'fixtures');
 

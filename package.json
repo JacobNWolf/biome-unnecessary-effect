@@ -22,10 +22,9 @@
   "keywords": [
     "biome-plugin"
   ],
+  "packageManager": "bun@1.4.4",
   "devDependencies": {
-    "@biomejs/biome": "2.2.4",
-    "@types/bun": "1.2.22",
-    "axios": "^1.10.0",
-    "vitest": "3.2.4"
+    "@biomejs/biome": "2.6.6",
+    "@types/bun": "1.4.4"
   }
 }

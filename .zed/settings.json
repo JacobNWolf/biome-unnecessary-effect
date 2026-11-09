@@ -1,0 +1,94 @@
+{
+  "lsp": {
+    "biome": {
+      "settings": {
+        "require_config_file": true,
+        "config_path": "./biome.json"
+      }
+    }
+  },
+  "languages": {
+    "TypeScript": {
+      "tab_size": 2,
+      "preferred_line_length": 120,
+      "language_servers": ["tsgo", "biome"],
+      "formatter": {
+        "language_server": {
+          "name": "biome"
+        }
+      },
+      "format_on_save": "on",
+      "prettier": {
+        "allowed": false
+      },
+      "code_actions_on_format": {
+        "source.fixAll.biome": true,
+        "source.organizeImports.biome": true
+      }
+    },
+    "TSX": {
+      "tab_size": 2,
+      "preferred_line_length": 120,
+      "language_servers": ["tsgo", "biome"],
+      "formatter": {
+        "language_server": {
+          "name": "biome"
+        }
+      },
+      "format_on_save": "on",
+      "prettier": {
+        "allowed": false
+      },
+      "code_actions_on_format": {
+        "source.fixAll.biome": true,
+        "source.organizeImports.biome": true
+      }
+    },
+    "JavaScript": {
+      "tab_size": 2,
+      "preferred_line_length": 120,
+      "language_servers": ["tsgo", "biome"],
+      "formatter": {
+        "language_server": {
+          "name": "biome"
+        }
+      },
+      "format_on_save": "on",
+      "prettier": {
+        "allowed": false
+      },
+      "code_actions_on_format": {
+        "source.fixAll.biome": true,
+        "source.organizeImports.biome": true
+      }
+    },
+    "JSON": {
+      "tab_size": 2,
+      "preferred_line_length": 120,
+      "language_servers": ["json-language-server", "biome"],
+      "formatter": {
+        "language_server": {
+          "name": "biome"
+        }
+      },
+      "format_on_save": "on",
+      "prettier": {
+        "allowed": false
+      }
+    },
+    "JSONC": {
+      "tab_size": 2,
+      "preferred_line_length": 120,
+      "language_servers": ["json-language-server", "biome"],
+      "formatter": {
+        "language_server": {
+          "name": "biome"
+        }
+      },
+      "format_on_save": "on",
+      "prettier": {
+        "allowed": false
+      }
+    }
+  }
+}
