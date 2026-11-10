@@ -16,3 +16,33 @@ export function ChatRoom({ roomId, theme }: { roomId: string; theme: string }) {
   }, [roomId]);
   return null;
 }
+
+declare const emitter: { on(event: string, handler: (error: unknown) => void): () => void };
+
+export function Notice({
+  onDismiss,
+  onError,
+  onWheel,
+}: {
+  onDismiss: () => void;
+  onError: (error: unknown) => void;
+  onWheel: () => void;
+}) {
+  const dismiss = useEffectEvent(onDismiss);
+  const emitError = useEffectEvent(onError);
+  const handleWheel = useEffectEvent(onWheel);
+
+  useEffect(() => {
+    const timer = setTimeout(dismiss, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => emitter.on('error', emitError), []);
+
+  useEffect(() => {
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  return null;
+}

@@ -1,4 +1,4 @@
-import { useEffectEvent } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 
 declare function useTimer(callback: () => void, delay: number): void;
 declare function Child(props: { onEvent: () => void }): null;
@@ -20,4 +20,14 @@ export function Timer({ onTick, label }: { onTick: () => void; label: string }) 
       <Child onEvent={passedAsProp} /> {/* expect: noPassingEffectEvent */}
     </>
   );
+}
+
+export function Mixed({ onTick }: { onTick: () => void }) {
+  const tick = useEffectEvent(() => onTick());
+  useEffect(() => {
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  useTimer(tick, 500); // expect: noPassingEffectEvent
+  return null;
 }
