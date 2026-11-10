@@ -201,7 +201,15 @@ or {
         layout_hook(),
         effect_event_hook()
       },
-      $args <: contains $event until function_node()
+      $args <: contains $event until function_node(),
+      // Handing an Effect Event to a timer or an emitter from inside an effect is the documented use.
+      $use <: not within `$hook($_, $_)` where {
+        $hook <: or {
+          effect_hook(),
+          layout_hook()
+        }
+      },
+      $use <: not within `$hook($_)` where { $hook <: mount_hook() }
     }
   },
   register_diagnostic(span=$use, message=`Don't pass the Effect Event "$event" to components or hooks. Declare it with useEffectEvent next to the effect that calls it. See https://react.dev/reference/react/useEffectEvent`, severity="warn")
