@@ -154,25 +154,25 @@ This plugin doesn't check dependency arrays or hook order. Biome's built-in rule
 
 ## Rules
 
-| Rule                                                              | Finds                                                        | Preset      |
-| ----------------------------------------------------------------- | ------------------------------------------------------------ | ----------- |
-| [`noEmptyEffect`](#noemptyeffect)                                 | Effects with an empty body                                   | recommended |
-| [`noInitializeState`](#noinitializestate)                         | State set once on mount                                      | recommended |
-| [`noDerivedState`](#noderivedstate)                               | State computed from other state or props                     | recommended |
-| [`noChainStateUpdates`](#nochainstateupdates)                     | State set because other state changed                        | recommended |
-| [`noEventHandler`](#noeventhandler)                               | Effects that do the work of an event handler                 | recommended |
-| [`noFetchWithoutCleanup`](#nofetchwithoutcleanup)                 | Requests with no cleanup                                     | recommended |
-| [`noPassLiveStateToParent`](#nopasslivestatetoparent)             | State sent to a parent callback                              | recommended |
-| [`noAdjustStateOnPropChange`](#noadjuststateonpropchange)         | State set because a prop changed                             | recommended |
-| [`noResetAllStateOnPropChange`](#noresetallstateonpropchange)     | All state reset because a prop changed                       | recommended |
-| [`noPassDataToParent`](#nopassdatatoparent)                       | Fetched data sent to a parent callback                       | recommended |
-| [`noExternalStoreSubscription`](#noexternalstoresubscription)     | Subscriptions that `useSyncExternalStore` can replace        | recommended |
-| [`noEffectEventOutsideEffect`](#noeffecteventoutsideeffect)       | Effect Events called outside an effect                       | recommended |
-| [`noPassingEffectEvent`](#nopassingeffectevent)                   | Effect Events passed to components or hooks                  | recommended |
-| [`noAsyncEffectCallback`](#noasynceffectcallback)                 | `async` effect callbacks                                     | recommended |
-| [`noSetStateInEffectWithoutDeps`](#nosetstateineffectwithoutdeps) | State set in an effect with no dependency array              | recommended |
-| [`preferUseEffectEvent`](#preferuseeffectevent)                   | Refs that only copy the latest value                         | react19     |
-| [`noDerivedStateDeep`](#noderivedstatedeep)                       | The same as `noDerivedState`, with more data flow            | deep        |
+| Rule                                                              | Finds                                                 | Preset      |
+| ----------------------------------------------------------------- | ----------------------------------------------------- | ----------- |
+| [`noEmptyEffect`](#noemptyeffect)                                 | Effects with an empty body                            | recommended |
+| [`noInitializeState`](#noinitializestate)                         | State set once on mount                               | recommended |
+| [`noDerivedState`](#noderivedstate)                               | State computed from other state or props              | recommended |
+| [`noChainStateUpdates`](#nochainstateupdates)                     | State set because other state changed                 | recommended |
+| [`noEventHandler`](#noeventhandler)                               | Effects that do the work of an event handler          | recommended |
+| [`noFetchWithoutCleanup`](#nofetchwithoutcleanup)                 | Requests with no cleanup                              | recommended |
+| [`noPassLiveStateToParent`](#nopasslivestatetoparent)             | State sent to a parent callback                       | recommended |
+| [`noAdjustStateOnPropChange`](#noadjuststateonpropchange)         | State set because a prop changed                      | recommended |
+| [`noResetAllStateOnPropChange`](#noresetallstateonpropchange)     | All state reset because a prop changed                | recommended |
+| [`noPassDataToParent`](#nopassdatatoparent)                       | Fetched data sent to a parent callback                | recommended |
+| [`noExternalStoreSubscription`](#noexternalstoresubscription)     | Subscriptions that `useSyncExternalStore` can replace | recommended |
+| [`noEffectEventOutsideEffect`](#noeffecteventoutsideeffect)       | Effect Events called outside an effect                | recommended |
+| [`noPassingEffectEvent`](#nopassingeffectevent)                   | Effect Events passed to components or hooks           | recommended |
+| [`noAsyncEffectCallback`](#noasynceffectcallback)                 | `async` effect callbacks                              | recommended |
+| [`noSetStateInEffectWithoutDeps`](#nosetstateineffectwithoutdeps) | State set in an effect with no dependency array       | recommended |
+| [`preferUseEffectEvent`](#preferuseeffectevent)                   | Refs that only copy the latest value                  | react19     |
+| [`noDerivedStateDeep`](#noderivedstatedeep)                       | The same as `noDerivedState`, with more data flow     | deep        |
 
 The examples below show code that each rule reports.
 
@@ -406,14 +406,14 @@ Biome runs each plugin on each file. On a 696-file React codebase, all the GritQ
 
 Renamed rules:
 
-| 0.1                          | 0.2                                                |
-| ---------------------------- | -------------------------------------------------- |
-| `avoidEmptyEffect`           | `noEmptyEffect`                                    |
-| `avoidInitializingState`     | `noInitializeState`                                |
-| `avoidDerivedOrChainedState` | `noDerivedState` and `noChainStateUpdates`         |
-| `avoidEventHandler`          | `noEventHandler`                                   |
-| `avoidDataFetchingInEffect`  | `noFetchWithoutCleanup` (reports fewer cases)      |
-| `avoidParentChildCoupling`   | `noPassLiveStateToParent`                          |
+| 0.1                          | 0.2                                           |
+| ---------------------------- | --------------------------------------------- |
+| `avoidEmptyEffect`           | `noEmptyEffect`                               |
+| `avoidInitializingState`     | `noInitializeState`                           |
+| `avoidDerivedOrChainedState` | `noDerivedState` and `noChainStateUpdates`    |
+| `avoidEventHandler`          | `noEventHandler`                              |
+| `avoidDataFetchingInEffect`  | `noFetchWithoutCleanup` (reports fewer cases) |
+| `avoidParentChildCoupling`   | `noPassLiveStateToParent`                     |
 
 ## Contributing
 
