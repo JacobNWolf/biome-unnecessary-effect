@@ -206,5 +206,26 @@ pattern enclosing_function($name, $params, $body) {
     JsIfStatement(),
     JsReturnStatement()
   },
+  // An Effect Event can only be called from effects, so every other read must be in one.
+  $assignment <: within enclosing_function($unused1, $unused2, $component),
+  $component <: not contains $ref as $use where {
+    $use <: not within or {
+      `const $ref = useRef($_)`,
+      `const $ref = React.useRef($_)`
+    },
+    $use <: not within `$readHook($_, $_)` where {
+      $readHook <: or {
+        effect_hook(),
+        layout_hook()
+      }
+    },
+    $use <: not within `$readHook($_)` where {
+      $readHook <: or {
+        effect_hook(),
+        layout_hook(),
+        mount_hook()
+      }
+    }
+  },
   register_diagnostic(span=$assignment, message=`This effect only copies "$value" into "$ref" so other code can read the latest value. On React 19.2+, read "$value" inside a useEffectEvent function instead. See https://react.dev/reference/react/useEffectEvent`, severity="info")
 }
