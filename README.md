@@ -233,6 +233,8 @@ useEffect(() => {
 
 Call `submit(form)` from the event handler that calls `setForm`. [Learn more](https://react.dev/learn/you-might-not-need-an-effect#sharing-logic-between-event-handlers)
 
+Conditions that only update state are covered by the state rules, so this rule stays quiet for them.
+
 ### `noFetchWithoutCleanup`
 
 ```tsx

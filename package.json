@@ -1,6 +1,6 @@
 {
   "name": "@jacobwolf/biome-unnecessary-effect",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Biome plugin that flags unnecessary and misused React effects.",
   "keywords": [
     "biome",
