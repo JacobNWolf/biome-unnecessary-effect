@@ -10,3 +10,11 @@ export function Game() {
   }, [round]);
   return isGameOver;
 }
+
+export function Liked({ fetched }: { fetched: boolean }) {
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    if (fetched && !hasMounted) setHasMounted(true); // expect: noAdjustStateOnPropChange
+  }, [fetched, hasMounted]);
+  return hasMounted;
+}
