@@ -206,5 +206,5 @@ pattern enclosing_function($name, $params, $body) {
     `props.$_`
   },
   $arg <: contains state_reference($component, $body, $state),
-  register_diagnostic(span=$call, message=`Avoid passing live state to a parent in an effect. Lift "$state" into the parent and pass it down as a prop, or return it from the custom hook. See https://react.dev/learn/you-might-not-need-an-effect#notifying-parent-components-about-state-changes`, severity="warn")
+  register_diagnostic(span=$call, message=`Avoid passing live state to a parent in an effect. Lift "$state" into the parent and pass it down as a prop, or return it from the custom hook. To commit edits to the parent, call the callback from the event handler that changes "$state", and debounce the callback instead of the value. See https://react.dev/learn/you-might-not-need-an-effect#notifying-parent-components-about-state-changes`, severity="warn")
 }

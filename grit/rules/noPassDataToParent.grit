@@ -209,9 +209,11 @@ pattern enclosing_function($name, $params, $body) {
   $arg <: contains $data where {
     $data <: r"[A-Za-z_$][A-Za-z0-9_$]*",
     $component <: contains or {
-      `const $data = $source($_)`,
-      `const { $fields } = $source($_)` where { $fields <: contains $data }
+      `const $data = $source($hookArgs)`,
+      `const { $fields } = $source($hookArgs)` where { $fields <: contains $data }
     } where {
+      // A hook fed local state (useDebounce(text), useDeferredValue(query)) returns live state, which noPassLiveStateToParent reports.
+      $hookArgs <: not contains state_reference($component, $body, $unusedState),
       $source <: r"use[A-Z][A-Za-z0-9_]*",
       $source <: not or {
         `useState`,
