@@ -16,3 +16,12 @@ export function SearchResults({ query }: { query: string }) {
   }, [query]);
   return results;
 }
+
+export function Profile({ id }: { id: string }) {
+  const [profile, setProfile] = useState<unknown>(null);
+  useEffect(() => {
+    const request = fetch(`/users/${id}`); // expect: noFetchWithoutCleanup
+    request.then((response) => response.json()).then(setProfile);
+  }, [id]);
+  return profile;
+}

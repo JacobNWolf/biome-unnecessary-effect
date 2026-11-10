@@ -210,5 +210,14 @@ pattern enclosing_function($name, $params, $body) {
     `ky.$_($_)`
   } as $request,
   $body <: not contains cleanup_return() until function_node(),
+  // One request per mount has no newer response to race it.
+  $deps <: not `[]`,
+  // A response that is never read can't overwrite anything.
+  $body <: contains or {
+    `await $request`,
+    `$request.then($_)`,
+    `$request.then($_, $_)`,
+    `const $_ = $request`
+  },
   register_diagnostic(span=$request, message="This request has no cleanup, so a slower, older response can overwrite a newer one. Return a cleanup that aborts the request or ignores its result, or use a data-fetching library. See https://react.dev/learn/you-might-not-need-an-effect#fetching-data", severity="warn")
 }
