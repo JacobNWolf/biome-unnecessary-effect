@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 function subscribe(onChange: () => void) {
   window.addEventListener('online', onChange);
@@ -39,4 +39,41 @@ export function useInitial(store: { read: () => number }) {
     console.log(initial);
     return () => {};
   }, [store]);
+}
+
+// Layout measurement needs the committed DOM node.
+export function HasScroll() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [hasScroll, setHasScroll] = useState(false);
+  useEffect(() => {
+    const element = ref.current;
+    const check = () => {
+      if (element) setHasScroll(element.scrollWidth > element.clientWidth);
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return <div ref={ref}>{String(hasScroll)}</div>;
+}
+
+declare const editor: {
+  on(event: string, cb: () => void): void;
+  off(event: string, cb: () => void): void;
+  doc: string;
+};
+
+// The effect re-subscribes when its own state changes, so it isn't reading a store.
+export function Confirmation() {
+  const [moved, setMoved] = useState<string>();
+  useEffect(() => {
+    if (!moved) return;
+    const clear = () => {
+      if (moved !== editor.doc) setMoved(undefined);
+    };
+    editor.on('update', clear);
+    clear();
+    return () => editor.off('update', clear);
+  }, [moved]);
+  return moved;
 }

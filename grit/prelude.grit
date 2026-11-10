@@ -172,6 +172,17 @@ pattern prop_reference($scope, $local, $params, $ref) {
 // Bare `return;` exits early and must not count as cleanup.
 pattern cleanup_return() { `return $value` where { $value <: r"[\s\S]+" } }
 
+// DOM nodes and layout exist only after commit, so effects that read them can't move into render.
+pattern reads_dom() {
+  contains or {
+    `$_.current`,
+    `new ResizeObserver($_)`,
+    `new IntersectionObserver($_)`,
+    `new IntersectionObserver($_, $_)`,
+    `new MutationObserver($_)`
+  }
+}
+
 pattern enclosing_function($name, $params, $body) {
   or {
     `function $name($params) { $body }`,
