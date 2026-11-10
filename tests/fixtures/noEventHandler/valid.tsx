@@ -42,8 +42,8 @@ export function Like({ fetched, likes }: { fetched: boolean; likes: string[] }) 
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => {
     if (fetched && !hasMounted) {
-      setCount(likes.filter(Boolean).length); // expect: noDerivedState, noChainStateUpdates, noDerivedStateDeep
-      setHasMounted(true); // expect: noAdjustStateOnPropChange, noChainStateUpdates
+      setCount(likes.filter(Boolean).length); // expect: noDerivedState, noDerivedStateDeep
+      setHasMounted(true); // expect: noAdjustStateOnPropChange
     }
   }, [fetched, hasMounted]);
   return count;

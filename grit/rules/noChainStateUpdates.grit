@@ -206,5 +206,7 @@ pattern enclosing_function($name, $params, $body) {
   $setter <: state_setter($component, $state, $setter),
   $deps <: contains state_reference($component, $body, $dep) until JsCallExpression(),
   $arg <: not contains state_reference($component, $body, $unused2),
+  // A prop in the deps makes this noAdjustStateOnPropChange or noDerivedState, which give better advice.
+  $deps <: not contains prop_reference($component, $body, $params, $unused3),
   register_diagnostic(span=$call, message=`Avoid chaining state updates. Update "$state" in the same event handler that changes "$dep" instead. See https://react.dev/learn/you-might-not-need-an-effect#chains-of-computations`, severity="warn")
 }
