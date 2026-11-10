@@ -30,3 +30,39 @@ export function EarlyReturn() {
   }, [query]);
   return <input value={query} onChange={(event) => setQuery(event.target.value)} />;
 }
+
+export function SaveAndTrack() {
+  const [saved, setSaved] = useState(false);
+  const [toast, setToast] = useState('');
+  useEffect(() => {
+    if (saved) { // expect: noEventHandler
+      setToast('Saved'); // expect: noChainStateUpdates
+      showNotification('Saved');
+    }
+  }, [saved]);
+  return (
+    <button type="button" onClick={() => setSaved(true)}>
+      {toast}
+    </button>
+  );
+}
+
+export function GuardedSubmit({ form }: { form: object | null }) {
+  const [sent, setSent] = useState(false);
+  useEffect(() => {
+    if (!form) return; // expect: noEventHandler
+    setSent(true); // expect: noAdjustStateOnPropChange
+    submitData(form);
+  }, [form]);
+  return sent;
+}
+
+export function BlockGuard({ zoom }: { zoom: number }) {
+  useEffect(() => {
+    if (zoom <= 0) { // expect: noEventHandler
+      return;
+    }
+    showNotification(`Zoom ${zoom}`);
+  }, [zoom]);
+  return null;
+}

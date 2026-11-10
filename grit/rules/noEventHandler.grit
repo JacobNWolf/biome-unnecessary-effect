@@ -186,7 +186,7 @@ pattern enclosing_function($name, $params, $body) {
 }
 // prelude:end
 or {
-  `if ($test) { $_ }`,
+  `if ($test) { $then }`,
   `if ($test) return;`
 } as $if where {
   $if <: not contains JsElseClause() until JsBlockStatement(),
@@ -195,6 +195,25 @@ or {
   $body <: contains $if until function_node(),
   $body <: not contains cleanup_return() until function_node(),
   $if <: within enclosing_function($unused1, $params, $component),
+  // Setter calls and ref writes alone are state sync, which the state rules report with better advice.
+  // An early return guards the rest of the effect body instead of a block.
+  or {
+    and {
+      $if <: or {
+        `if ($_) return;`,
+        `if ($_) { return; }`
+      },
+      $body <: contains and { side_effect_call($component),
+      not within $if } until function_node()
+    },
+    and {
+      $if <: not or {
+        `if ($_) return;`,
+        `if ($_) { return; }`
+      },
+      $then <: contains side_effect_call($component) until function_node()
+    }
+  },
   or {
     and {
       $test <: contains state_reference($component, $body, $ref),
@@ -206,4 +225,12 @@ or {
     }
   },
   register_diagnostic(span=$test, message=$message, severity="warn")
+}
+
+// A call that isn't a state setter. Calls inside a setter's arguments compute the next state, so they don't count.
+pattern side_effect_call($component) {
+  JsCallExpression() as $call where {
+    $call <: not within `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) },
+    $call <: not `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) }
+  }
 }
