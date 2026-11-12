@@ -10,7 +10,7 @@
       "no-external-store-subscription": 10,
       "no-initialize-state": 11,
       "no-pass-data-to-parent": 7,
-      "no-pass-live-state-to-parent": 12,
+      "no-pass-live-state-to-parent": 18,
       "no-reset-all-state-on-prop-change": 11
     },
     "deep": {
@@ -21,7 +21,7 @@
       "no-external-store-subscription": 10,
       "no-initialize-state": 11,
       "no-pass-data-to-parent": 7,
-      "no-pass-live-state-to-parent": 12,
+      "no-pass-live-state-to-parent": 18,
       "no-reset-all-state-on-prop-change": 11
     }
   },

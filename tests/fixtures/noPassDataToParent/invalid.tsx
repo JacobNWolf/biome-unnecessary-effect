@@ -48,3 +48,20 @@ export function UserLoader({ id, onLoad }: { id: string; onLoad: (user: unknown)
   }, [user, onLoad]);
   return null;
 }
+
+export function DestructuredProps(props: { onFetched: (data: unknown) => void; label: string }) {
+  const { onFetched, label } = props;
+  const data = useSomeAPI();
+  useEffect(() => {
+    onFetched(data); // expect: noPassDataToParent
+  }, [data, onFetched]);
+  return label;
+}
+
+export function LocalWrapper({ onFetched }: { onFetched: (data: unknown) => void }) {
+  const wrapped = (value: unknown) => onFetched(value);
+  const data = useSomeAPI();
+  useEffect(() => {
+    wrapped(data); // expect: noPassDataToParent
+  }, [data, wrapped]);
+}

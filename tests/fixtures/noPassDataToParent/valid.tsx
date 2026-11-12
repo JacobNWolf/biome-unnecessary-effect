@@ -36,3 +36,11 @@ export function ForwardProp({ value, onValue }: { value: string; onValue: (value
   }, [onValue, value]);
   return null;
 }
+
+export function ReadsProp({ offset }: { offset: number }) {
+  const data = useSomeAPI();
+  const log = (value: unknown) => console.log(value, offset);
+  useEffect(() => {
+    log(data);
+  }, [data, log]);
+}
