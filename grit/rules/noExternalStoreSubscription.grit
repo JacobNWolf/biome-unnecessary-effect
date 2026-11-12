@@ -366,9 +366,12 @@ pattern enclosing_function($name, $params, $body) {
         `$setter($_)`,
         `$wrapper($_)` where {
           $body <: contains or {
-            `const $wrapper = ($_) => $wrapperBody`,
-            `function $wrapper($_) { $wrapperBody }`
-          } where { $wrapperBody <: contains `$setter($_)` }
+            `const $wrapper = $setter`,
+            or {
+              `const $wrapper = ($_) => $wrapperBody`,
+              `function $wrapper($_) { $wrapperBody }`
+            } where { $wrapperBody <: contains `$setter($_)` }
+          }
         }
       } as $sync until function_node()
     }
