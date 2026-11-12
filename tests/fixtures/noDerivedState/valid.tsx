@@ -1,3 +1,4 @@
+import { useCustomCompareEffect } from '@react-hookz/web';
 import { useEffect, useState } from 'react';
 
 declare const socket: { on: (event: string, cb: (message: string) => void) => () => void };
@@ -16,7 +17,7 @@ export function LetAlias() {
   const [data, setData] = useState();
   let set = setData;
   useEffect(() => {
-    set(data); // expect: noDerivedStateDeep
+    set(data);
   }, [data]);
 }
 
@@ -61,7 +62,7 @@ export function ArrayDefault({ posts }) {
 export function HookzDerived({ value }) {
   const [result, setResult] = useState('');
   useCustomCompareEffect(() => {
-    setResult(value); // expect: noDerivedStateDeep
+    setResult(value);
   }, [value], cmp, useLayoutEffect);
   return result;
 }
