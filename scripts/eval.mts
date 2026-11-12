@@ -1,9 +1,16 @@
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, normalize } from 'node:path';
+import { basename, join, normalize } from 'node:path';
 import { mapValues, partition } from 'es-toolkit';
 
-import { compareBaseline, PRESETS, type Preset, presetRule, validateBaseline } from './eval-baseline.ts';
+import {
+  compareBaseline,
+  compareFlagged,
+  PRESETS,
+  type Preset,
+  presetRule,
+  validateBaseline,
+} from './eval-baseline.ts';
 
 const CaseKind = {
   Valid: 'valid',
@@ -11,7 +18,7 @@ const CaseKind = {
 } as const;
 
 type CaseKind = (typeof CaseKind)[keyof typeof CaseKind];
-type Case = { rule: string; kind: CaseKind; name?: string; code: string; file: string };
+type Case = { rule: string; kind: CaseKind; name: string; code: string; file: string };
 type Test = string | { name?: string; code: string };
 type Tests = Record<CaseKind, Test[]>;
 type Manifest = { plugins: { rules: Record<string, string>[]; presets: Record<Preset, string[]> } };
@@ -61,46 +68,64 @@ const cloneUpstream = (): string => {
     throw new Error(`${UPSTREAM} ${tag} is ${head || 'unknown'}, expected ${baseline.upstreamCommit}.`);
   }
 
-  return join(dir, 'src', 'rules');
+  return join(dir, 'src');
 };
 
 const stubImports = (source: string, file: string) =>
   source.replace(/^import\s+(.+?)\s+from\s+["']([^"']+)["'];?$/gm, (_, binding: string, specifier: string) => {
     if (specifier === 'eslint') return `const ${binding} = globalThis.__stubs.eslint;`;
-    if (specifier.endsWith('.ts')) return `const ${binding} = globalThis.__stubs.module;`;
+    if (specifier.endsWith('.ts'))
+      return `const ${binding} = { ...globalThis.__stubs.module, rule: '${basename(specifier, '.ts')}' };`;
+
+    if (specifier === '@typescript-eslint/parser') return `const ${binding} = globalThis.__stubs.tsParser;`;
 
     throw new Error(`${file} imports ${specifier}, which the eval doesn't stub`);
   });
 
-const extractCases = async (rulesDir: string): Promise<Case[]> => {
+const extractCases = async (srcDir: string): Promise<Case[]> => {
   const cases: Case[] = [];
 
+  const tsParser = {};
   class RuleTester {
-    run(rule: string, _implementation: unknown, tests: Tests) {
+    extension: string;
+
+    constructor(config?: { languageOptions?: { parser?: unknown } }) {
+      this.extension = config?.languageOptions?.parser === tsParser ? '.tsx' : '.jsx';
+    }
+
+    run(_suite: string, { rule }: { rule: string }, tests: Tests) {
       for (const kind of Object.values(CaseKind)) {
         for (const test of tests[kind]) {
           const { name, code } = typeof test === 'string' ? { name: undefined, code: test } : test;
-          const file = `cases/${String(cases.length).padStart(3, '0')}.jsx`;
+          const file = `cases/${String(cases.length).padStart(3, '0')}${this.extension}`;
 
-          cases.push({ rule, kind, name, code, file });
+          cases.push({ rule, kind, name: name ?? code, code, file });
         }
       }
     }
   }
 
-  Object.assign(globalThis, { __stubs: { eslint: { RuleTester }, module: { configs: { recommended: {} } } } });
+  Object.assign(globalThis, {
+    __stubs: { tsParser, eslint: { RuleTester }, module: { configs: { recommended: {} } } },
+  });
 
-  const testFiles = readdirSync(rulesDir)
-    .filter((name) => name.endsWith('.test.js'))
-    .sort();
+  for (const suite of ['rules', 'util']) {
+    const rulesDir = join(srcDir, suite);
+    const testFiles = readdirSync(rulesDir)
+      .filter((name) => name.endsWith('.test.js'))
+      .sort();
 
-  for (const file of testFiles) {
-    const stubbed = join(rulesDir, `${file}.stubbed.mjs`);
-    writeFileSync(stubbed, stubImports(readFileSync(join(rulesDir, file), 'utf8'), file));
+    for (const file of testFiles) {
+      const stubbed = join(rulesDir, `${file}.stubbed.mjs`);
+      writeFileSync(stubbed, stubImports(readFileSync(join(rulesDir, file), 'utf8'), file));
 
-    await import(stubbed);
+      await import(stubbed);
+    }
   }
-
+  const ids = cases.map((c) => `[${c.rule}] ${c.name}`);
+  const duplicate = ids.find((id, i) => ids.indexOf(id) !== i);
+  if (duplicate)
+    throw new Error(`Upstream has two cases named ${duplicate}, so scripts/eval-baseline.json can't tell them apart.`);
   return cases;
 };
 
@@ -194,10 +219,13 @@ const score = (cases: Case[], hits: Set<string>, ruleFor: (upstreamRule: string)
 
   const wrong = cases.filter((c) => reported(c) !== (c.kind === CaseKind.Invalid));
   const misses = wrong.map(
-    (c) => `${c.kind === CaseKind.Invalid ? 'missed' : 'false positive'}: [${c.rule}] ${c.name ?? c.file}`,
+    (c) => `${c.kind === CaseKind.Invalid ? 'missed' : 'false positive'}: [${c.rule}] ${c.name}`,
   );
 
-  return { rows, total, misses };
+  const flagged = mapValues(byRule, (group) =>
+    (group ?? []).filter((c) => c.kind === CaseKind.Valid && reported(c)).map((c) => c.name),
+  );
+  return { rows, total, misses, flagged };
 };
 
 try {
@@ -220,7 +248,7 @@ try {
   );
 
   for (const preset of Object.keys(PRESETS) as Preset[]) {
-    const { rows, total, misses } = score(cases, ours, presetRule(preset, manifest.plugins.presets[preset]));
+    const { rows, total, misses, flagged } = score(cases, ours, presetRule(preset, manifest.plugins.presets[preset]));
 
     const comparison = compareBaseline(
       preset,
@@ -238,7 +266,7 @@ try {
 
     for (const miss of misses) console.log(`  ${miss}`);
 
-    if (total.flagged) failures.push(`${preset} flags ${total.flagged} valid case(s).`);
+    failures.push(...compareFlagged(preset, flagged, baseline.flagged[preset]));
   }
 
   for (const note of notes) console.log(`\n${note}`);
