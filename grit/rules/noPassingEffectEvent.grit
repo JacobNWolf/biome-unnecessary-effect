@@ -15,16 +15,31 @@ pattern effect_hook() {
 // JsImport handles multi-specifier imports on Biome 2.4.5; until nodes are tested before their children are skipped.
 pattern mount_hook() {
   $hook where {
-    $hook <: or { `useMount`, `useEffectOnce`, `useMountEffect` },
+    $hook <: or {
+      `useMount`,
+      `useEffectOnce`,
+      `useMountEffect`
+    },
     $program <: not contains or {
-      and {
-        JsImport(),
-        contains $hook,
-        not contains or { `"react-use"`, `'react-use'`, `"ahooks"`, `'ahooks'`, `"@react-hookz/web"`, `'@react-hookz/web'`, `"primereact/hooks"`, `'primereact/hooks'` }
-      },
+      and { JsImport(),
+      contains $hook,
+      not contains or {
+        `"react-use"`,
+        `'react-use'`,
+        `"ahooks"`,
+        `'ahooks'`,
+        `"@react-hookz/web"`,
+        `'@react-hookz/web'`,
+        `"primereact/hooks"`,
+        `'primereact/hooks'`
+      } },
       `function $hook($_) { $_ }`,
       `const $hook = $_`
-    } until or { JsFunctionDeclaration(), JsVariableDeclarator(), JsExpressionStatement() }
+    } until or {
+      JsFunctionDeclaration(),
+      JsVariableDeclarator(),
+      JsExpressionStatement()
+    }
   }
 }
 
