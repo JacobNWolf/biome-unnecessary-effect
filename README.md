@@ -399,7 +399,7 @@ The GritQL rules match names, not bindings, and follow data through one local va
 
 The `deep` preset fixes the first, second and fourth items, but only for `noDerivedState`. The other rules still use GritQL.
 
-On the ESLint plugin's rule and util test cases (v1.2.0), the `recommended` preset finds 123 of 162 problems and the `deep` preset finds 134. Each preset reports 4 of the 135 valid cases; `flagged` in `scripts/eval-baseline.json` lists each one with the reason.
+On the ESLint plugin's rule and util test cases (v1.2.0), the `recommended` preset finds 126 of 162 problems and the `deep` preset finds 134. Each preset reports 4 of the 135 valid cases; `flagged` in `scripts/eval-baseline.json` lists each one with the reason.
 
 Biome runs each plugin on each file. On a 696-file React codebase, all the GritQL rules together add about 11 seconds to a lint run.
 

@@ -5,7 +5,7 @@
     "recommended": {
       "no-adjust-state-on-prop-change": 7,
       "no-chain-state-updates": 5,
-      "no-derived-state": 52,
+      "no-derived-state": 55,
       "no-event-handler": 8,
       "no-external-store-subscription": 10,
       "no-initialize-state": 11,

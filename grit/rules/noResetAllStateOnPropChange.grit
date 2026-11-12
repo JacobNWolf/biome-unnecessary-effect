@@ -1,7 +1,7 @@
 language js
 
 // prelude:start: generated from grit/prelude.grit by `bun run sync:prelude`; do not edit here
-// Import resolution makes checks 15-100x slower, so renamed hooks require the deep preset.
+// Renamed hooks need the deep preset: resolving imports per candidate call doubles each rule's cost, and Biome 2.4.5 can't match specifiers like `useEffect as $alias`.
 pattern effect_hook() {
   or {
     `useEffect`,
@@ -77,27 +77,37 @@ pattern sync_callback($body) {
   } }
 }
 
+pattern use_state_call($init) {
+  or {
+    `useState($init)`,
+    `useState<$_>($init)`,
+    `React.useState($init)`,
+    `React.useState<$_>($init)`,
+    `useState($init) as $_`,
+    `useState<$_>($init) as $_`,
+    `React.useState($init) as $_`,
+    `React.useState<$_>($init) as $_`
+  }
+}
+
 pattern state_declaration($state, $setter, $init) {
   or {
-    `const [$state, $setter] = useState($init)`,
-    `const [$state, $setter] = useState<$_>($init)`,
-    `const [$state, $setter] = React.useState($init)`,
-    `const [$state, $setter] = React.useState<$_>($init)`
-  }
+    `const [$state, $setter] = $call`,
+    `const [$state = $_, $setter] = $call`,
+    // Value-less state has no name, so messages name the setter, as upstream does.
+    `const [, $setter] = $call` where { $setter <: $state }
+  } where { $call <: use_state_call($init) }
 }
 
 // GritQL has no lookup cache; component-scoped searches avoid repeated file-wide walks.
 pattern state_setter($scope, $state, $setter) {
   $setter where {
     $setter <: r"[A-Za-z_$][A-Za-z0-9_$]*",
-    $scope <: contains `const [$state, $setter] = $init` where {
-      $init <: or {
-        `useState($_)`,
-        `useState<$_>($_)`,
-        `React.useState($_)`,
-        `React.useState<$_>($_)`
-      }
-    } until function_node()
+    $scope <: contains or {
+      `const [$state, $setter] = $call`,
+      `const [$state = $_, $setter] = $call`,
+      `const [, $setter] = $call` where { $setter <: $state }
+    } where { $call <: use_state_call($unusedInit) } until function_node()
   }
 }
 
@@ -135,15 +145,9 @@ pattern state_reference($scope, $local, $ref) {
     or {
       $scope <: contains or {
         `const [$ref, $_] = $init`,
-        `const [$ref] = $init`
-      } where {
-        $init <: or {
-          `useState($_)`,
-          `useState<$_>($_)`,
-          `React.useState($_)`,
-          `React.useState<$_>($_)`
-        }
-      } until function_node(),
+        `const [$ref] = $init`,
+        `const [$ref = $_, $_] = $init`
+      } where { $init <: use_state_call($unusedInit) } until function_node(),
       and {
         or {
           $local <: contains or {
@@ -159,15 +163,9 @@ pattern state_reference($scope, $local, $ref) {
           $source <: binding_name(),
           $scope <: contains or {
             `const [$source, $_] = $sourceInit`,
-            `const [$source] = $sourceInit`
-          } where {
-            $sourceInit <: or {
-              `useState($_)`,
-              `useState<$_>($_)`,
-              `React.useState($_)`,
-              `React.useState<$_>($_)`
-            }
-          } until function_node()
+            `const [$source] = $sourceInit`,
+            `const [$source = $_, $_] = $sourceInit`
+          } where { $sourceInit <: use_state_call($unusedSourceInit) } until function_node()
         }
       }
     }
@@ -258,10 +256,7 @@ pattern enclosing_function($name, $params, $body) {
   $deps <: contains prop_reference($component, $body, $params, $prop),
   // `useState()` starts as undefined, so `setX()` and `setX(undefined)` both reset it.
   $component <: not contains or {
-    `const [$_] = useState($_)`,
-    `const [$_] = useState<$_>($_)`,
-    `const [$_] = React.useState($_)`,
-    `const [$_] = React.useState<$_>($_)`,
+    `const [$_] = $call` where { $call <: use_state_call($unused3) },
     or {
       `const [$_, $empty] = useState()`,
       `const [$_, $empty] = useState<$_>()`
