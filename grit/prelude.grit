@@ -79,7 +79,8 @@ pattern state_setter($scope, $state, $setter) {
 // Setter references in handlers or passed to children indicate editable state, not derived values.
 pattern written_outside_effects($setter) {
   contains $setter as $use where {
-    $use <: not within state_declaration($_, $setter, $_),
+    // Biome 2.4.5 rejects `$_` arguments in custom pattern calls.
+    $use <: not within state_declaration($unusedState, $setter, $unusedInit),
     $use <: not within `$hook($_, $_)` where {
       $hook <: or {
         effect_hook(),
