@@ -370,7 +370,7 @@ On React 19.2 and newer, read `callback` in a `useEffectEvent` function. This ru
 
 ### `noDerivedStateDeep`
 
-This rule finds the same problems as `noDerivedState`. It also follows setter aliases, local helper functions and renamed imports.
+This rule finds the same problems as `noDerivedState`. It also follows `const` setter aliases, local helper functions, renamed and namespace imports from React-compatible modules (`react`, `preact/hooks`, `preact/compat`, `@wordpress/element`), and components wrapped in calls such as `memo`.
 
 ```tsx
 function Greeting({ name }) {
@@ -397,9 +397,9 @@ The GritQL rules match names, not bindings, and follow data through one local va
 
 `noInitializeState` doesn't report an effect with no dependency array. `noSetStateInEffectWithoutDeps` reports it.
 
-The `deep` preset handles the remaining setter aliases, wrapper setters and renamed imports, but only for `noDerivedState`. The other rules still use GritQL.
+The `deep` preset handles the remaining setter aliases, wrapper setters, memo-wrapped components and namespace/default React aliases, but only for `noDerivedState`. The other rules still use GritQL.
 
-On the ESLint plugin's rule and util test cases (v1.2.0), the `recommended` preset finds 143 of 162 problems and the `deep` preset finds 148. Each preset reports 4 of the 135 valid cases; `flagged` in `scripts/eval-baseline.json` lists each one with the reason.
+On the ESLint plugin's rule and util test cases (v1.2.0), the `recommended` preset finds 143 of 162 problems and the `deep` preset finds 156. `recommended` reports 4 of the 135 valid cases and `deep` reports 2; `flagged` in `scripts/eval-baseline.json` lists each one with the reason.
 
 Biome runs each plugin on each file. On a 696-file React codebase, all the GritQL rules together add about 11 seconds to a lint run.
 
