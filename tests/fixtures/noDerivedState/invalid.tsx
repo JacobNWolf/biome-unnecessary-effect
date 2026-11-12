@@ -74,3 +74,19 @@ export function DirectAlias() {
     setDataWrapper(data); // expect: noDerivedState, noDerivedStateDeep
   }, [data]);
 }
+
+export function CompareProp({ value }) {
+ const [result, setResult] = useState("");
+ useCustomCompareEffect(() => {
+  setResult(value); // expect: noDerivedState, noDerivedStateDeep
+ }, [value], cmp);
+ return result;
+}
+export function SecondPost({ posts }) {
+ const [secondPost, setSecondPost] = useState();
+ useEffect(() => {
+  const [, second] = posts;
+  setSecondPost(second); // expect: noDerivedState, noDerivedStateDeep
+ }, [posts]);
+ return secondPost;
+}

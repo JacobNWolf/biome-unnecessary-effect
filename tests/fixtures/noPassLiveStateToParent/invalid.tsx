@@ -108,3 +108,24 @@ export const Components = {
     }, [data, onFetched]);
   },
 };
+
+export const AssertedCallback = ({ onFetched }: { onFetched: (v: string) => void }) => {
+  const [data, setData] = useState<string>();
+  useEffect(() => {
+    onFetched!(data); // expect: noPassLiveStateToParent
+  }, [onFetched, data]);
+};
+
+export const AssertedProps = (props: { onFetched: (v: string) => void }) => {
+  const [data, setData] = useState<string>();
+  useEffect(() => {
+    (props as any).onFetched(data); // expect: noPassLiveStateToParent
+  }, [props, data]);
+};
+
+export function ComparedState({ onFetched }) {
+  const [data, setData] = useState('');
+  useCustomCompareEffect(() => {
+    onFetched(data); // expect: noPassLiveStateToParent
+  }, [data, onFetched], cmp);
+}

@@ -44,3 +44,19 @@ export function ReadsProp({ offset }: { offset: number }) {
     log(data);
   }, [data, log]);
 }
+
+export function LocalSearch({ onFetched }) {
+ const [query, setQuery] = useState("");
+ const results = useSearch(query);
+ const top = results[0];
+ useEffect(() => {
+  onFetched(top);
+ }, [top, onFetched]);
+}
+
+export function HookzData({ onFetched }) {
+  const data = useSomeAPI();
+  useCustomCompareEffect(() => {
+    onFetched(data);
+  }, [data, onFetched], cmp, useLayoutEffect);
+}

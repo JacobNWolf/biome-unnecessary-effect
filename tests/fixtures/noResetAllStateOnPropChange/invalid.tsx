@@ -19,3 +19,21 @@ export function Picker({ items }: { items: string[] }) {
   }, [items]);
   return picked ?? pending;
 }
+
+export function AssertedInitial({ id }) {
+ const [user, setUser] = useState(null as string | null);
+ useEffect(() => { // expect: noResetAllStateOnPropChange
+  setUser(null); // expect: noAdjustStateOnPropChange
+ }, [id]);
+ return user;
+}
+
+export function AssertedReset({ id }) {
+  const [count, setCount] = useState(0);
+  const [draft, setDraft] = useState('');
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    setCount(0 as number); // expect: noAdjustStateOnPropChange
+    setDraft('' satisfies string); // expect: noAdjustStateOnPropChange
+  }, [id]);
+  return [count, draft];
+}

@@ -8,3 +8,11 @@ export function List({ items }: { items: string[] }) {
   }, [items]);
   return `${isReverse}${selection}`;
 }
+
+export function ComparedList({ items }) {
+  const [selection, setSelection] = useState(null);
+  useCustomCompareEffect(() => {
+    setSelection(null); // expect: noAdjustStateOnPropChange
+  }, [items], cmp);
+  return selection;
+}

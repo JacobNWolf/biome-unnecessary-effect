@@ -18,3 +18,12 @@ export function Liked({ fetched }: { fetched: boolean }) {
   }, [fetched, hasMounted]);
   return hasMounted;
 }
+
+export function ComparedRound() {
+  const [round] = useState(1);
+  const [isGameOver, setIsGameOver] = useState(false);
+  useCustomCompareEffect(() => {
+    setIsGameOver(true); // expect: noChainStateUpdates
+  }, [round], cmp);
+  return isGameOver;
+}
