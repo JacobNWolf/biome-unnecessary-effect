@@ -32,10 +32,6 @@
         "Set to result of pure local ArrowFunctionExpression": "Upstream stopped tracing state through call arguments (see util/ast.test.js). This state is still derived, so the report is correct.",
         "Set to result of internal useCallback; repeat references to a useState variable": "Upstream stopped tracing state through call arguments (see util/ast.test.js). This state is still derived, so the report is correct."
       },
-      "no-initialize-state": {
-        "useMount from some-unknown-library": "Matches useMount by name, not by where it's imported from.",
-        "local useMount that is not imported": "Matches useMount by name, not by where it's imported from."
-      },
       "no-pass-data-to-parent": {
         "Renamed useRef import": "Doesn't recognise useRef imported under another name, so it treats the ref as data."
       }
@@ -45,10 +41,6 @@
         "From internal state via pure global function": "Upstream stopped tracing state through call arguments (see util/ast.test.js). This state is still derived, so the report is correct.",
         "useCustomCompareEffect from @react-hookz/web": "The deep rule treats this hook as an effect; upstream doesn't.",
         "Alias declared with `let` is ignored": "Follows let setter aliases; upstream follows only const aliases, because a let may be reassigned."
-      },
-      "no-initialize-state": {
-        "useMount from some-unknown-library": "Matches useMount by name, not by where it's imported from.",
-        "local useMount that is not imported": "Matches useMount by name, not by where it's imported from."
       },
       "no-pass-data-to-parent": {
         "Renamed useRef import": "Doesn't recognise useRef imported under another name, so it treats the ref as data."
