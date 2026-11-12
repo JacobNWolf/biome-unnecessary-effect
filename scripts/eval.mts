@@ -31,8 +31,15 @@ const baseline = validateBaseline(readJson(BASELINE_PATH), UPSTREAM_VERSION);
 const manifest: Manifest = readJson(join(ROOT, 'biome-manifest.json'));
 const work = mkdtempSync(join(tmpdir(), 'bue-eval-'));
 
+const COMMAND_TIMEOUT_MS = 120_000;
+
 const run = (cmd: string[]) => {
-  const { stdout, stderr, exitCode } = Bun.spawnSync(cmd, { cwd: work });
+  const { stdout, stderr, exitCode, exitedDueToTimeout } = Bun.spawnSync(cmd, {
+    cwd: work,
+    timeout: COMMAND_TIMEOUT_MS,
+  });
+
+  if (exitedDueToTimeout) throw new Error(`Timed out after ${COMMAND_TIMEOUT_MS / 1000}s: ${cmd.join(' ')}`);
 
   return { stdout: stdout.toString(), stderr: stderr.toString(), exitCode };
 };
@@ -46,6 +53,13 @@ const cloneUpstream = (): string => {
   const { exitCode, stderr } = run(['git', 'clone', '--quiet', '--depth=1', `--branch=${tag}`, UPSTREAM_REPO, dir]);
 
   if (exitCode !== 0) throw new Error(`Couldn't clone ${UPSTREAM} ${tag}.\n${stderr}`);
+
+  // Tags are mutable, so only run test files from the commit the baseline was reviewed against.
+  const head = run(['git', '-C', dir, 'rev-parse', 'HEAD']).stdout.trim();
+
+  if (head !== baseline.upstreamCommit) {
+    throw new Error(`${UPSTREAM} ${tag} is ${head || 'unknown'}, expected ${baseline.upstreamCommit}.`);
+  }
 
   return join(dir, 'src', 'rules');
 };

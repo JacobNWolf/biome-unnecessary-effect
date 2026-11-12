@@ -1,5 +1,6 @@
 {
   "upstream": "1.2.0",
+  "upstreamCommit": "ff0e4a0d8a9acf4a08b4f24f32417eb16dfb3f5d",
   "caught": {
     "recommended": {
       "no-adjust-state-on-prop-change": 7,
@@ -15,7 +16,7 @@
     "deep": {
       "no-adjust-state-on-prop-change": 7,
       "no-chain-state-updates": 5,
-      "no-derived-state": 19,
+      "no-derived-state": 20,
       "no-event-handler": 8,
       "no-external-store-subscription": 10,
       "no-initialize-state": 6,

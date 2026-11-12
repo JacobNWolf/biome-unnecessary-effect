@@ -4,6 +4,7 @@ import { compareBaseline, presetRule, validateBaseline } from '../scripts/eval-b
 
 const baseline = () => ({
   upstream: '1.2.0',
+  upstreamCommit: 'ff0e4a0d8a9acf4a08b4f24f32417eb16dfb3f5d',
   caught: {
     recommended: { 'no-derived-state': 18, 'no-event-handler': 8 },
     deep: { 'no-derived-state': 20, 'no-event-handler': 8 },
@@ -25,7 +26,14 @@ describe('eval baseline validation', () => {
   test.each([undefined, {}, { recommended: {} }, { recommended: 82, deep: 84 }])(
     'rejects absent or incomplete per-rule baselines: %j',
     (caught) => {
-      expect(() => validateBaseline({ upstream: '1.2.0', caught }, '1.2.0')).toThrow();
+      expect(() => validateBaseline({ ...baseline(), caught }, '1.2.0')).toThrow();
+    },
+  );
+
+  test.each([undefined, 'v1.2.0', 'ff0e4a0', 'FF0E4A0D8A9ACF4A08B4F24F32417EB16DFB3F5D'])(
+    'rejects a missing or non-SHA upstream commit: %j',
+    (upstreamCommit) => {
+      expect(() => validateBaseline({ ...baseline(), upstreamCommit }, '1.2.0')).toThrow('full commit SHA');
     },
   );
 

@@ -6,7 +6,7 @@ export const PRESETS = {
 } as const;
 
 export type Preset = keyof typeof PRESETS;
-type Baseline = { upstream: string; caught: Record<Preset, Record<string, number>> };
+type Baseline = { upstream: string; upstreamCommit: string; caught: Record<Preset, Record<string, number>> };
 
 export const validateBaseline = (value: unknown, version: string): Baseline => {
   const baseline = value as Baseline | null | undefined;
@@ -15,6 +15,10 @@ export const validateBaseline = (value: unknown, version: string): Baseline => {
     throw new Error(
       `The eval baseline must match upstream v${version}. Update scripts/eval-baseline.json and the README.`,
     );
+  }
+
+  if (typeof baseline.upstreamCommit !== 'string' || !/^[0-9a-f]{40}$/.test(baseline.upstreamCommit)) {
+    throw new Error(`The eval baseline needs the full commit SHA of upstream v${version} as upstreamCommit.`);
   }
 
   for (const preset of Object.keys(PRESETS) as Preset[]) {
