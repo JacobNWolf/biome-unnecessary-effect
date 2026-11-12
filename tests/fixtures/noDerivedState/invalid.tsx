@@ -66,3 +66,11 @@ export function DefaultedSource() {
   }, [count, next]);
   return [direct, indirect, setCount];
 }
+
+export function DirectAlias() {
+  const [data, setData] = useState();
+  const setDataWrapper = setData;
+  useEffect(() => {
+    setDataWrapper(data); // expect: noDerivedState, noDerivedStateDeep
+  }, [data]);
+}

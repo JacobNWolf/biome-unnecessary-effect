@@ -110,22 +110,26 @@ pattern state_declaration($state, $setter, $init) {
 }
 
 // GritQL has no lookup cache; component-scoped searches avoid repeated file-wide walks.
-pattern state_setter($scope, $state, $setter) {
+pattern state_setter($scope, $state, $setter, $original) {
   $setter where {
     $setter <: r"[A-Za-z_$][A-Za-z0-9_$]*",
     $scope <: contains or {
-      `const [$state, $setter] = $call`,
-      `const [$state = $_, $setter] = $call`,
-      `const [, $setter] = $call` where { $setter <: $state }
-    } where { $call <: use_state_call($unusedInit) } until declaration_boundary()
+      state_declaration($state, $setter, $unusedInit) where { $original = $setter },
+      // One hop: a let alias may be reassigned.
+      `const $setter = $original` where {
+        $scope <: contains state_declaration($state, $original, $aliasInit) until declaration_boundary()
+      }
+    } until declaration_boundary()
   }
 }
 
 // Setter references in handlers or passed to children indicate editable state, not derived values.
-pattern written_outside_effects($setter) {
-  contains $setter as $use where {
+pattern written_outside_effects($target, $alias) {
+  contains $target as $use where {
     // Biome 2.4.5 rejects `$_` arguments in custom pattern calls.
-    $use <: not within state_declaration($unusedState, $setter, $unusedInit),
+    $use <: not within state_declaration($unusedState, $target, $unusedInit),
+    $use <: not within `const $target = $_`,
+    $use <: not within `const $alias = $target`,
     $use <: not within `$hook($_, $_)` where {
       $hook <: or {
         effect_hook(),
@@ -299,11 +303,12 @@ pattern enclosing_function($name, $params, $body) {
   $cb <: sync_callback($body),
   $body <: contains $call until function_node(),
   $call <: within enclosing_function($unused1, $params, $component),
-  $setter <: state_setter($component, $state, $setter),
+  $setter <: state_setter($component, $state, $setter, $original),
   $deps <: contains prop_reference($component, $body, $params, $prop),
   or {
     $arg <: not contains prop_reference($component, $body, $params, $unused2),
-    $component <: written_outside_effects($setter)
+    $component <: written_outside_effects($setter, $original),
+    and { $original <: not $setter, $component <: written_outside_effects($original, $setter) }
   },
   register_diagnostic(span=$call, message=`Avoid adjusting state when a prop changes. Adjust "$state" during render when "$prop" changes, or restructure state so it isn't needed. See https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes`, severity="warn")
 }

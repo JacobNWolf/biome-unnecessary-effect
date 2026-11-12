@@ -110,22 +110,26 @@ pattern state_declaration($state, $setter, $init) {
 }
 
 // GritQL has no lookup cache; component-scoped searches avoid repeated file-wide walks.
-pattern state_setter($scope, $state, $setter) {
+pattern state_setter($scope, $state, $setter, $original) {
   $setter where {
     $setter <: r"[A-Za-z_$][A-Za-z0-9_$]*",
     $scope <: contains or {
-      `const [$state, $setter] = $call`,
-      `const [$state = $_, $setter] = $call`,
-      `const [, $setter] = $call` where { $setter <: $state }
-    } where { $call <: use_state_call($unusedInit) } until declaration_boundary()
+      state_declaration($state, $setter, $unusedInit) where { $original = $setter },
+      // One hop: a let alias may be reassigned.
+      `const $setter = $original` where {
+        $scope <: contains state_declaration($state, $original, $aliasInit) until declaration_boundary()
+      }
+    } until declaration_boundary()
   }
 }
 
 // Setter references in handlers or passed to children indicate editable state, not derived values.
-pattern written_outside_effects($setter) {
-  contains $setter as $use where {
+pattern written_outside_effects($target, $alias) {
+  contains $target as $use where {
     // Biome 2.4.5 rejects `$_` arguments in custom pattern calls.
-    $use <: not within state_declaration($unusedState, $setter, $unusedInit),
+    $use <: not within state_declaration($unusedState, $target, $unusedInit),
+    $use <: not within `const $target = $_`,
+    $use <: not within `const $alias = $target`,
     $use <: not within `$hook($_, $_)` where {
       $hook <: or {
         effect_hook(),

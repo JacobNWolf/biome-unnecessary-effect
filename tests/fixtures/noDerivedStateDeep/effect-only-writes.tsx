@@ -46,7 +46,7 @@ export function RenderScopeHelper({ count }: { count: number }) {
   }, [count]);
 
   useEffect(() => {
-    alias(count); // expect: noDerivedStateDeep
+    alias(count); // expect: noAdjustStateOnPropChange, noDerivedStateDeep
   }, [count]);
 
   return doubled;
