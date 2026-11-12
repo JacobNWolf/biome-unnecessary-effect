@@ -1,4 +1,4 @@
-import { camelCase, union } from 'es-toolkit';
+import { camelCase, difference, isPlainObject, union } from 'es-toolkit';
 
 export const PRESETS = {
   recommended: camelCase,
@@ -6,7 +6,12 @@ export const PRESETS = {
 } as const;
 
 export type Preset = keyof typeof PRESETS;
-type Baseline = { upstream: string; upstreamCommit: string; caught: Record<Preset, Record<string, number>> };
+type Baseline = {
+  upstream: string;
+  upstreamCommit: string;
+  caught: Record<Preset, Record<string, number>>;
+  flagged: Record<Preset, Record<string, Record<string, string>>>;
+};
 
 export const validateBaseline = (value: unknown, version: string): Baseline => {
   const baseline = value as Baseline | null | undefined;
@@ -24,13 +29,24 @@ export const validateBaseline = (value: unknown, version: string): Baseline => {
   for (const preset of Object.keys(PRESETS) as Preset[]) {
     const counts = baseline.caught?.[preset];
 
-    if (!counts || typeof counts !== 'object' || Array.isArray(counts) || !Object.keys(counts).length) {
+    if (!isPlainObject(counts) || !Object.keys(counts).length) {
       throw new Error(`Missing per-rule baseline for ${preset}.`);
     }
 
     for (const [rule, count] of Object.entries(counts)) {
       if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) {
         throw new Error(`Invalid baseline for ${preset} [${rule}]: expected a non-negative integer.`);
+      }
+    }
+
+    const flags = baseline.flagged?.[preset];
+    if (!isPlainObject(flags)) throw new Error(`Missing accepted flags for ${preset}.`);
+    for (const [rule, reasons] of Object.entries(flags)) {
+      if (!Object.hasOwn(counts, rule)) throw new Error(`Unknown rule in flagged ${preset} [${rule}].`);
+      if (!isPlainObject(reasons)) throw new Error(`${preset} [${rule}] needs a reason.`);
+      for (const [name, reason] of Object.entries(reasons)) {
+        if (typeof reason !== 'string' || !reason.trim())
+          throw new Error(`${preset} [${rule}] "${name}" needs a reason.`);
       }
     }
   }
@@ -76,3 +92,20 @@ export const compareBaseline = (preset: Preset, actual: Record<string, number>, 
 
   return { failures, notes };
 };
+
+export const compareFlagged = (
+  preset: Preset,
+  actual: Record<string, string[]>,
+  accepted: Record<string, Record<string, string>>,
+) =>
+  union(Object.keys(actual), Object.keys(accepted)).flatMap((rule) => {
+    const flagged = actual[rule] ?? [];
+    const listed = Object.keys(accepted[rule] ?? {});
+    return [
+      ...difference(flagged, listed).map((name) => `${preset} [${rule}] flags valid case "${name}".`),
+      ...difference(listed, flagged).map(
+        (name) =>
+          `${preset} [${rule}] no longer flags "${name}". Remove it from flagged in scripts/eval-baseline.json.`,
+      ),
+    ];
+  });

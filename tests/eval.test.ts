@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 
-import { compareBaseline, presetRule, validateBaseline } from '../scripts/eval-baseline.ts';
+import { compareBaseline, compareFlagged, presetRule, validateBaseline } from '../scripts/eval-baseline.ts';
 
 const baseline = () => ({
+  flagged: { recommended: { 'no-derived-state': { 'Case A': 'reason' } }, deep: {} },
   upstream: '1.2.0',
   upstreamCommit: 'ff0e4a0d8a9acf4a08b4f24f32417eb16dfb3f5d',
   caught: {
@@ -92,5 +93,51 @@ describe('eval per-rule regressions', () => {
     expect(() => compareBaseline('recommended', actual, expected)).toThrow(
       'Missing extracted cases or baseline for recommended [no-derived-state]',
     );
+  });
+});
+
+describe('eval accepted flags', () => {
+  test.each([undefined, null, {}, { recommended: {} }, { recommended: [], deep: {} }])(
+    'rejects malformed flags: %j',
+    (flagged) => {
+      expect(() => validateBaseline({ ...baseline(), flagged }, '1.2.0')).toThrow('Missing accepted flags');
+    },
+  );
+  test.each([[undefined], [null], [[]], ['reason']])('rejects malformed reason maps: %j', (reasons) => {
+    expect(() =>
+      validateBaseline({ ...baseline(), flagged: { recommended: { 'no-derived-state': reasons }, deep: {} } }, '1.2.0'),
+    ).toThrow('needs a reason');
+  });
+  test.each([undefined, '', '  ', 1])('rejects bad reasons: %j', (reason) => {
+    expect(() =>
+      validateBaseline(
+        { ...baseline(), flagged: { recommended: { 'no-derived-state': { 'Case A': reason } }, deep: {} } },
+        '1.2.0',
+      ),
+    ).toThrow('needs a reason');
+  });
+  test('rejects unknown rules', () => {
+    expect(() =>
+      validateBaseline({ ...baseline(), flagged: { recommended: { unknown: {} }, deep: {} } }, '1.2.0'),
+    ).toThrow('Unknown rule');
+  });
+  test('accepts listed flags', () => {
+    expect(compareFlagged('recommended', { 'no-derived-state': ['Case A'] }, baseline().flagged.recommended)).toEqual(
+      [],
+    );
+  });
+  test('rejects unlisted flags', () => {
+    expect(compareFlagged('deep', { rule: ['Case A'] }, {})).toEqual(['deep [rule] flags valid case "Case A".']);
+  });
+  test('rejects stale flags', () => {
+    expect(compareFlagged('deep', {}, { rule: { 'Case A': 'reason' } })).toEqual([
+      'deep [rule] no longer flags "Case A". Remove it from flagged in scripts/eval-baseline.json.',
+    ]);
+  });
+  test('keeps identical names under different rules separate', () => {
+    expect(compareFlagged('deep', { other: ['Case A'] }, { rule: { 'Case A': 'reason' } })).toEqual([
+      'deep [other] flags valid case "Case A".',
+      'deep [rule] no longer flags "Case A". Remove it from flagged in scripts/eval-baseline.json.',
+    ]);
   });
 });
