@@ -208,6 +208,8 @@ function Form({ first, last }) {
 
 Compute the value during render: `` const fullName = `${first} ${last}` ``. [Learn more](https://react.dev/learn/you-might-not-need-an-effect#updating-state-based-on-props-or-state)
 
+State that is also set outside effects, such as an input draft the user edits, isn't derived, so this rule skips it. [`noAdjustStateOnPropChange`](#noadjuststateonpropchange) reports it when a prop changes it.
+
 ### `noChainStateUpdates`
 
 ```tsx
@@ -397,7 +399,7 @@ The GritQL rules match names, not bindings, and follow data through one local va
 
 The `deep` preset fixes the first, second and fourth items, but only for `noDerivedState`. The other rules still use GritQL.
 
-On the test cases of the ESLint plugin (v1.2.0), the GritQL rules find 83 of 91 problems and report nothing on the 72 valid cases.
+On the test cases of the ESLint plugin (v1.2.0), the `recommended` preset finds 82 of 91 problems and the `deep` preset finds 84. In both presets, the matching rule reports none of the 72 valid cases.
 
 Biome runs each plugin on each file. On a 696-file React codebase, all the GritQL rules together add about 11 seconds to a lint run.
 
@@ -428,6 +430,8 @@ bun test
 ```
 
 Edit shared patterns in `grit/prelude.grit`, then run `bun run sync:prelude` to copy them into each rule file.
+
+To score the presets against the ESLint plugin's test cases (see [Known limits](#known-limits)), run `bun run eval`. It downloads the test cases for the installed ESLint plugin version, so it needs network access. It refuses to run them unless the version's tag resolves to the `upstreamCommit` in `scripts/eval-baseline.json`, so update that SHA when you bump the plugin. CI fails if a rule reports a valid case or catches fewer cases in a preset than `scripts/eval-baseline.json` records for that rule. When a change catches more, raise the rule's baseline and the numbers in Known limits.
 
 ## Credit
 

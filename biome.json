@@ -27,6 +27,7 @@
     "ignoreUnknown": false,
     "includes": [
       "**/*.ts",
+      "**/*.mts",
       "**/*.tsx",
       "**/*.js",
       "**/*.jsx",

@@ -36,6 +36,33 @@ export function RenamedEffects({ title }: { title: string }) {
   return label;
 }
 
+export function RenderScopeHelper({ count }: { count: number }) {
+  const [doubled, setDoubled] = useState(0);
+  const double = (value: number) => setDoubled(value * 2);
+  const alias = setDoubled;
+
+  useEffect(() => {
+    double(count); // expect: noDerivedStateDeep
+  }, [count]);
+
+  useEffect(() => {
+    alias(count); // expect: noDerivedStateDeep
+  }, [count]);
+
+  return doubled;
+}
+
+export function EditableHelper({ count }: { count: number }) {
+  const [draft, setDraft] = useState(count);
+  const update = (value: number) => setDraft(value);
+
+  useEffect(() => {
+    update(count);
+  }, [count]);
+
+  return <input value={draft} onChange={(event) => update(Number(event.target.value))} />;
+}
+
 export function RenamedEditable({ title }: { title: string }) {
   const [draft, setDraft] = useState(title);
   useFx(() => {

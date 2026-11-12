@@ -38,6 +38,9 @@ jobs:
 
       - run: bun test
 
+      - if: matrix.biome == 'locked'
+        run: bun run eval
+
   latest-biome:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

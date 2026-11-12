@@ -36,6 +36,7 @@
   },
   "scripts": {
     "test": "bun test",
+    "eval": "bun scripts/eval.mts",
     "format": "biome format",
     "format:fix": "biome format --write",
     "lint": "biome lint",
@@ -48,8 +49,11 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
-    "@types/bun": "1.4.4",
     "@biomejs/runtime": "2.6.6",
+    "@types/bun": "1.4.4",
+    "es-toolkit": "1.53.2",
+    "eslint-plugin-react-you-might-not-need-an-effect": "1.2.0",
+    "oxlint": "1.93.0",
     "typescript": "7.0.2"
   },
   "packageManager": "bun@1.4.4"
