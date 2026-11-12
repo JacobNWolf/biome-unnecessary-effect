@@ -37,3 +37,44 @@ export function AssertedReset({ id }) {
   }, [id]);
   return [count, draft];
 }
+
+export function EffectAliasReset({ userId }) {
+  const [user, setUser] = useState(null);
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    const reset = setUser;
+    reset(null);
+  }, [userId]);
+  return user;
+}
+
+export function ComponentAliasReset({ userId }) {
+  const [user, setUser] = useState(null);
+  const reset = setUser;
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    reset(null); // expect: noAdjustStateOnPropChange
+  }, [userId]);
+  return user;
+}
+
+export function HelperReset({ userId }) {
+  const [user, setUser] = useState(null);
+  const resetUser = () => setUser(null);
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    resetUser();
+  }, [userId]);
+  return user;
+}
+
+export function MultipleHelperResets({ userId }) {
+  const [user, setUser] = useState(null);
+  const [draft, setDraft] = useState('');
+  function resetUser() {
+    setUser(null);
+  }
+  const resetDraft = () => setDraft('');
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    resetUser();
+    resetDraft();
+  }, [userId]);
+  return [user, draft];
+}

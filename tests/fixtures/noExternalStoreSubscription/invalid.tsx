@@ -43,3 +43,13 @@ export function useAnchors() {
   }, []);
   return anchors;
 }
+
+export function useAliasedCount(store: { read: () => number }) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const update = setCount;
+    update(store.read()); // expect: noExternalStoreSubscription
+    return () => setCount(0);
+  }, []);
+  return count;
+}

@@ -345,9 +345,28 @@ pattern enclosing_function($name, $params, $body) {
   $cb <: sync_callback($body),
   $effect <: within enclosing_function($name, $params, $component),
   $name <: r"[A-Z][A-Za-z0-9_]*",
-  $body <: contains `$setter($_)` where {
-    $setter <: state_setter($component, $unused1, $setter)
-  } until function_node(),
+  or {
+    $body <: contains `$setter($_)` where {
+      $setter <: state_setter($component, $unused1, $setter)
+    } until function_node(),
+    $body <: contains `const $aliasSetter = $originalSetter` where {
+      $originalSetter <: state_setter($component, $unusedState, $originalSetter),
+      $body <: contains `$aliasSetter($_)` until function_node()
+    } until declaration_boundary(),
+    $body <: contains `$calledHelper()` where {
+      $component <: contains or {
+        `const $calledHelper = () => $calledBody`,
+        `function $calledHelper() { $calledBody }`
+      } as $calledOwner until declaration_boundary(),
+      $calledOwner <: not or {
+        `const $calledHelper = async () => $asyncBody`,
+        `async function $calledHelper() { $asyncBody }`
+      },
+      $calledBody <: contains `$calledSetter($_)` where {
+        $calledSetter <: state_setter($component, $unusedState, $calledSetter)
+      } until function_node()
+    } until function_node()
+  },
   $deps <: contains prop_reference($component, $body, $params, $prop),
   // `useState()` starts as undefined, so `setX()` and `setX(undefined)` both reset it.
   $component <: not contains or {
@@ -363,7 +382,26 @@ pattern enclosing_function($name, $params, $body) {
     },
     state_declaration($unused2, $other, $init) where {
       $init <: r"[\s\S]+",
-      $body <: not contains `$other($reset)` where {
+      $body <: not contains or {
+        `$other($reset)`,
+        `$alias($reset)` where {
+          or {
+            $body <: contains `const $alias = $other` until function_node(),
+            $component <: contains `const $alias = $other` until declaration_boundary()
+          }
+        },
+        `$helper()` where {
+          $component <: contains or {
+            `const $helper = () => $helperBody`,
+            `function $helper() { $helperBody }`
+          } as $helperOwner until declaration_boundary(),
+          $helperOwner <: not or {
+            `const $helper = async () => $asyncBody`,
+            `async function $helper() { $asyncBody }`
+          },
+          $helperBody <: contains `$other($reset)` until function_node()
+        }
+      } where {
         or {
           $init <: or {
             $reset,
@@ -377,6 +415,6 @@ pattern enclosing_function($name, $params, $body) {
         }
       } until function_node()
     }
-  } until function_node(),
+  } until declaration_boundary(),
   register_diagnostic(span=$effect, message=`Avoid resetting all state when a prop changes. If "$prop" identifies the item, render this component with key={$prop} so React resets its state. If the state is a draft the user is editing, adjust it during render instead, because a new key remounts the inputs. See https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes`, severity="warn")
 }
