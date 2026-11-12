@@ -29,10 +29,14 @@ export function Form({ title }: { title: string }) {
     apply(); // expect: noDerivedStateDeep
   }, [lastName]);
 
-  // Renamed imports need the semantic model.
+  return fullName;
+}
+
+export function Renamed({ title }: { title: string }) {
+  const [heading, setHeading] = useState('');
   useFx(() => {
-    setFullName(title); // expect: noDerivedStateDeep
+    setHeading(title); // expect: noDerivedStateDeep
   }, [title]);
 
-  return fullName;
+  return heading;
 }

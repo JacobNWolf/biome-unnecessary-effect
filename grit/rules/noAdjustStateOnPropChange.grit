@@ -78,6 +78,26 @@ pattern state_setter($scope, $state, $setter) {
   }
 }
 
+// Setter references in handlers or passed to children indicate editable state, not derived values.
+pattern written_outside_effects($setter) {
+  contains $setter as $use where {
+    $use <: not within state_declaration($_, $setter, $_),
+    $use <: not within `$hook($_, $_)` where {
+      $hook <: or {
+        effect_hook(),
+        layout_hook()
+      }
+    },
+    $use <: not within `$hook($_)` where {
+      $hook <: or {
+        effect_hook(),
+        layout_hook(),
+        mount_hook()
+      }
+    }
+  }
+}
+
 // Parameter defaults such as `disabled = false` must not make literals look like prop references.
 pattern binding_name() {
   and { r"[A-Za-z_$][A-Za-z0-9_$]*",
@@ -210,6 +230,9 @@ pattern enclosing_function($name, $params, $body) {
   $call <: within enclosing_function($unused1, $params, $component),
   $setter <: state_setter($component, $state, $setter),
   $deps <: contains prop_reference($component, $body, $params, $prop),
-  $arg <: not contains prop_reference($component, $body, $params, $unused2),
+  or {
+    $arg <: not contains prop_reference($component, $body, $params, $unused2),
+    $component <: written_outside_effects($setter)
+  },
   register_diagnostic(span=$call, message=`Avoid adjusting state when a prop changes. Adjust "$state" during render when "$prop" changes, or restructure state so it isn't needed. See https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes`, severity="warn")
 }

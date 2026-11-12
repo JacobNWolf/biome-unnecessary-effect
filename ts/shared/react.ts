@@ -14,11 +14,12 @@ const EFFECT_HOOKS = new Set([
   'useShallowEffect',
   ...MOUNT_HOOKS,
 ]);
+const LAYOUT_HOOKS = new Set(['useLayoutEffect', 'useInsertionEffect']);
 const COMPONENT_OR_HOOK = /^(?:[A-Z]|use[A-Z])/;
 
 export type Source =
   | { kind: 'state'; name: string }
-  | { kind: 'setter'; state: string }
+  | { kind: 'setter'; state: string; binding: Binding }
   | { kind: 'prop'; name: string };
 
 const isFunction = (node: AnyJsAstNode | undefined) =>
@@ -105,7 +106,7 @@ const classify = (binding: Binding): Source | undefined => {
     const index = elements.findIndex((element) => element.text.split('=')[0]?.trim() === node.text);
     const state = elements[0]?.text.split('=')[0]?.trim() ?? node.text;
     if (index === 0) return { kind: 'state', name: node.text };
-    if (index === 1) return { kind: 'setter', state };
+    if (index === 1) return { kind: 'setter', state, binding };
   }
 
   if (hook === 'useContext') return { kind: 'prop', name: node.text };
@@ -159,16 +160,20 @@ export interface Effect {
   mountOnly: boolean;
 }
 
-export const effectOf = (model: SemanticModel, call: AnyJsAstNode): Effect | undefined => {
-  if (call.kind !== 'JS_CALL_EXPRESSION') return undefined;
-
+const hookName = (model: SemanticModel, call: JsCallExpression): string | undefined => {
   const callee = unwrap(call.callee);
-  let name = calleeName(callee);
   if (callee?.kind === 'JS_IDENTIFIER_EXPRESSION' && callee.name) {
     const binding = model.binding(callee.name);
     const specifier = binding && findAncestor(binding.syntax(), 'JS_NAMED_IMPORT_SPECIFIER');
-    if (specifier) name = specifier.text.split(/\s+as\s+/)[0]?.trim();
+    if (specifier) return specifier.text.split(/\s+as\s+/)[0]?.trim();
   }
+  return calleeName(callee);
+};
+
+export const effectOf = (model: SemanticModel, call: AnyJsAstNode): Effect | undefined => {
+  if (call.kind !== 'JS_CALL_EXPRESSION') return undefined;
+
+  const name = hookName(model, call);
   if (!name || !EFFECT_HOOKS.has(name)) return undefined;
 
   const first = unwrap(call.arguments?.args[0]);
@@ -181,6 +186,19 @@ export const effectOf = (model: SemanticModel, call: AnyJsAstNode): Effect | und
   if (!isFunction(fn) || isAsync(fn)) return undefined;
   return { callback: fn, deps: unwrap(call.arguments?.args[1]), mountOnly: MOUNT_HOOKS.has(name) };
 };
+
+export const writtenOutsideEffects = (model: SemanticModel, setter: Binding): boolean =>
+  setter.allReferences().some(
+    (reference) =>
+      !reference
+        .syntax()
+        .ancestors()
+        .some((ancestor) => {
+          if (ancestor.kind !== 'JS_CALL_EXPRESSION') return false;
+          const name = hookName(model, ancestor);
+          return !!name && (EFFECT_HOOKS.has(name) || LAYOUT_HOOKS.has(name));
+        }),
+  );
 
 export interface SynchronousCall {
   call: JsCallExpression;
