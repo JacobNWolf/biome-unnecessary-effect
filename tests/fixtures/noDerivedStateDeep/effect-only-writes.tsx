@@ -1,6 +1,6 @@
 import React, { useEffect, useEffect as useFx, useLayoutEffect as useLayout, useState } from 'react';
 
-declare function useMount(callback: () => void): void;
+import { useMount } from 'react-use';
 
 export function EffectOnlyWrites({ title }: { title: string }) {
   const [label, setLabel] = React.useState<string>('');

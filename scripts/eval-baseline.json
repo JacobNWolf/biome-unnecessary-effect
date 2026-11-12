@@ -16,7 +16,7 @@
     "deep": {
       "no-adjust-state-on-prop-change": 7,
       "no-chain-state-updates": 5,
-      "no-derived-state": 63,
+      "no-derived-state": 71,
       "no-event-handler": 8,
       "no-external-store-subscription": 11,
       "no-initialize-state": 12,
@@ -38,9 +38,7 @@
     },
     "deep": {
       "no-derived-state": {
-        "From internal state via pure global function": "Upstream stopped tracing state through call arguments (see util/ast.test.js). This state is still derived, so the report is correct.",
-        "useCustomCompareEffect from @react-hookz/web": "The deep rule treats this hook as an effect; upstream doesn't.",
-        "Alias declared with `let` is ignored": "Follows let setter aliases; upstream follows only const aliases, because a let may be reassigned."
+        "From internal state via pure global function": "Upstream stopped tracing state through call arguments (see util/ast.test.js). This state is still derived, so the report is correct."
       },
       "no-pass-data-to-parent": {
         "Renamed useRef import": "Doesn't recognise useRef imported under another name, so it treats the ref as data."
