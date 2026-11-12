@@ -9,3 +9,10 @@ export function Counter() {
   });
   return count + width;
 }
+
+export const ArrowCounter = () => {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    setN(n + 1); // expect: noSetStateInEffectWithoutDeps
+  });
+};
