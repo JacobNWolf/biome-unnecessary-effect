@@ -187,18 +187,43 @@ export const effectOf = (model: SemanticModel, call: AnyJsAstNode): Effect | und
   return { callback: fn, deps: unwrap(call.arguments?.args[1]), mountOnly: MOUNT_HOOKS.has(name) };
 };
 
+const isEffectCall = (model: SemanticModel, node: AnyJsAstNode): boolean => {
+  if (node.kind !== 'JS_CALL_EXPRESSION') return false;
+
+  const name = hookName(model, node);
+
+  return !!name && (EFFECT_HOOKS.has(name) || LAYOUT_HOOKS.has(name));
+};
+
+// A setter in a local helper or alias runs wherever the helper is called. A component or hook boundary means
+// render or handler code, which counts as outside effects.
+const usedOnlyInEffects = (model: SemanticModel, binding: Binding, seen = new Set<string>()): boolean => {
+  const key = nodeKey(binding.syntax());
+
+  if (seen.has(key)) return true;
+  seen.add(key);
+
+  return binding.allReferences().every((reference) => {
+    for (const ancestor of reference.syntax().ancestors()) {
+      if (isEffectCall(model, ancestor)) return true;
+
+      if (ancestor.kind === 'JS_VARIABLE_DECLARATOR' || ancestor.kind === 'JS_FUNCTION_DECLARATION') {
+        const id = ancestor.id;
+
+        if (id?.kind !== 'JS_IDENTIFIER_BINDING' || COMPONENT_OR_HOOK.test(id.text)) return false;
+
+        const local = model.asBinding(id);
+
+        return !!local && usedOnlyInEffects(model, local, seen);
+      }
+    }
+
+    return false;
+  });
+};
+
 export const writtenOutsideEffects = (model: SemanticModel, setter: Binding): boolean =>
-  setter.allReferences().some(
-    (reference) =>
-      !reference
-        .syntax()
-        .ancestors()
-        .some((ancestor) => {
-          if (ancestor.kind !== 'JS_CALL_EXPRESSION') return false;
-          const name = hookName(model, ancestor);
-          return !!name && (EFFECT_HOOKS.has(name) || LAYOUT_HOOKS.has(name));
-        }),
-  );
+  !usedOnlyInEffects(model, setter);
 
 export interface SynchronousCall {
   call: JsCallExpression;
