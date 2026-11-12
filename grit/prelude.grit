@@ -76,10 +76,16 @@ pattern state_setter($scope, $state, $setter) {
   }
 }
 
+// Parameter defaults such as `disabled = false` must not make literals look like prop references.
+pattern binding_name() {
+  and { r"[A-Za-z_$][A-Za-z0-9_$]*",
+  not r"(?:true|false|null|undefined|this)" }
+}
+
 // Tracing follows one hop through component/effect locals, excluding other nested functions.
 pattern state_reference($scope, $local, $ref) {
   $ref where {
-    $ref <: r"[A-Za-z_$][A-Za-z0-9_$]*",
+    $ref <: binding_name(),
     or {
       $scope <: contains or {
         `const [$ref, $_] = $init`,
@@ -104,7 +110,7 @@ pattern state_reference($scope, $local, $ref) {
           } until function_node()
         },
         $value <: contains $source where {
-          $source <: r"[A-Za-z_$][A-Za-z0-9_$]*",
+          $source <: binding_name(),
           $scope <: contains or {
             `const [$source, $_] = $sourceInit`,
             `const [$source] = $sourceInit`
@@ -125,7 +131,7 @@ pattern state_reference($scope, $local, $ref) {
 // Parent callback checks skip one-hop tracing to keep per-call lookups cheap.
 pattern prop_or_context($scope, $params, $ref) {
   $ref where {
-    $ref <: r"[A-Za-z_$][A-Za-z0-9_$]*",
+    $ref <: binding_name(),
     or {
       $params <: contains $ref,
       $scope <: contains `const $binding = $context` where {
@@ -145,7 +151,7 @@ pattern prop_or_context($scope, $params, $ref) {
 // One-hop tracing follows props only; context values must be referenced directly.
 pattern prop_reference($scope, $local, $params, $ref) {
   $ref where {
-    $ref <: r"[A-Za-z_$][A-Za-z0-9_$]*",
+    $ref <: binding_name(),
     or {
       $params <: contains $ref,
       $scope <: contains `const $binding = $context` where {
@@ -163,7 +169,7 @@ pattern prop_reference($scope, $local, $params, $ref) {
           $local <: contains `const $ref = $value` until function_node(),
           $scope <: contains `const $ref = $value` until function_node()
         },
-        $value <: contains $source where { $source <: r"[A-Za-z_$][A-Za-z0-9_$]*", $params <: contains $source }
+        $value <: contains $source where { $source <: binding_name(), $params <: contains $source }
       }
     }
   }
