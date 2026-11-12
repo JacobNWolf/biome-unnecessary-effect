@@ -65,3 +65,25 @@ export function LocalWrapper({ onFetched }: { onFetched: (data: unknown) => void
     wrapped(data); // expect: noPassDataToParent
   }, [data, wrapped]);
 }
+
+export function FirstData({ onFetched }) {
+ const data = useSomeAPI();
+ const first = data[0];
+ useEffect(() => {
+  onFetched(first); // expect: noPassDataToParent
+ }, [first, onFetched]);
+}
+
+export function AssertedDataCallback({ onFetched }) {
+  const data = useSomeAPI();
+  useCustomCompareEffect(() => {
+    onFetched!(data); // expect: noPassDataToParent
+  }, [data, onFetched], cmp);
+}
+
+export function AssertedDataProps(props) {
+  const data = useSomeAPI();
+  useEffect(() => {
+    (props as any).onFetched(data); // expect: noPassDataToParent
+  }, [data, props]);
+}

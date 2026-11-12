@@ -66,3 +66,11 @@ export function BlockGuard({ zoom }: { zoom: number }) {
   }, [zoom]);
   return null;
 }
+
+export function ComparedNotification({ saved }) {
+  useCustomCompareEffect(() => {
+    if (saved) { // expect: noEventHandler
+      showNotification('Saved');
+    }
+  }, [saved], cmp);
+}

@@ -19,3 +19,10 @@ export function Hook() {
     onFetched(data);
   }, [onFetched, data]);
 }
+
+export function HookzCompare({ onChange }) {
+ const [state, setState] = useState("");
+ useCustomCompareEffect(() => {
+  onChange(state);
+ }, [state], cmp, useLayoutEffect);
+}
