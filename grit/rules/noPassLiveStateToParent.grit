@@ -78,6 +78,27 @@ pattern state_setter($scope, $state, $setter) {
   }
 }
 
+// Setter references in handlers or passed to children indicate editable state, not derived values.
+pattern written_outside_effects($setter) {
+  contains $setter as $use where {
+    // Biome 2.4.5 rejects `$_` arguments in custom pattern calls.
+    $use <: not within state_declaration($unusedState, $setter, $unusedInit),
+    $use <: not within `$hook($_, $_)` where {
+      $hook <: or {
+        effect_hook(),
+        layout_hook()
+      }
+    },
+    $use <: not within `$hook($_)` where {
+      $hook <: or {
+        effect_hook(),
+        layout_hook(),
+        mount_hook()
+      }
+    }
+  }
+}
+
 // Parameter defaults such as `disabled = false` must not make literals look like prop references.
 pattern binding_name() {
   and { r"[A-Za-z_$][A-Za-z0-9_$]*",

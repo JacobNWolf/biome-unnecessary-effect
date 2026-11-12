@@ -390,6 +390,7 @@ The GritQL rules match names, not bindings, and follow data through one local va
 - **They miss wrapper setters and helper calls**, such as `const resetUser = () => setUser(null)`.
 - **They miss values derived from hook data** before the value goes to a parent callback.
 - **They miss renamed imports**, such as `import { useEffect as useFx }`.
+- A setter called inside a renamed effect hook counts as a write outside effects, so `noDerivedState` skips that state.
 - **They can report shadowed names.** A local `const error` in an effect counts as the state variable `error`.
 
 `noInitializeState` doesn't report an effect with no dependency array. `noSetStateInEffectWithoutDeps` reports it.
