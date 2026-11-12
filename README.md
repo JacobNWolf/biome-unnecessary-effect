@@ -388,8 +388,8 @@ function Greeting({ name }) {
 
 The GritQL rules match names, not bindings, and follow data through one local variable only. Because of this:
 
-- They follow one `const` setter alias declared in the component, such as `const reset = setUser`, but miss aliases declared in an effect, chains of aliases and destructured aliases. `let` aliases are skipped on purpose, as upstream does.
-- **They miss wrapper setters and helper calls**, such as `const resetUser = () => setUser(null)`.
+- They follow one `const` setter alias declared in the component, such as `const reset = setUser`. `noResetAllStateOnPropChange` and `noExternalStoreSubscription` also follow one declared in an effect. They miss chains of aliases and destructured aliases. `let` aliases are skipped on purpose, as upstream does.
+- **`noDerivedState` misses wrapper setters and helper calls.** `noResetAllStateOnPropChange` follows one synchronous, no-argument helper declared in the component, such as `const resetUser = () => setUser(null)`. It skips helpers that call other helpers, async helpers and helpers wrapped in `useCallback`.
 - **They miss renamed imports**, such as `import { useEffect as useFx }`.
 - A setter called inside a renamed effect hook counts as a write outside effects, so `noDerivedState` skips that state.
 - Only `noPassLiveStateToParent` and `noPassDataToParent` follow props destructured after the signature.
@@ -399,7 +399,7 @@ The GritQL rules match names, not bindings, and follow data through one local va
 
 The `deep` preset handles the remaining setter aliases, wrapper setters and renamed imports, but only for `noDerivedState`. The other rules still use GritQL.
 
-On the ESLint plugin's rule and util test cases (v1.2.0), the `recommended` preset finds 140 of 162 problems and the `deep` preset finds 145. Each preset reports 4 of the 135 valid cases; `flagged` in `scripts/eval-baseline.json` lists each one with the reason.
+On the ESLint plugin's rule and util test cases (v1.2.0), the `recommended` preset finds 143 of 162 problems and the `deep` preset finds 148. Each preset reports 4 of the 135 valid cases; `flagged` in `scripts/eval-baseline.json` lists each one with the reason.
 
 Biome runs each plugin on each file. On a 696-file React codebase, all the GritQL rules together add about 11 seconds to a lint run.
 

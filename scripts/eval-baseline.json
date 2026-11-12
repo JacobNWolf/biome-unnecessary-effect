@@ -7,22 +7,22 @@
       "no-chain-state-updates": 5,
       "no-derived-state": 58,
       "no-event-handler": 8,
-      "no-external-store-subscription": 10,
+      "no-external-store-subscription": 11,
       "no-initialize-state": 12,
       "no-pass-data-to-parent": 8,
       "no-pass-live-state-to-parent": 20,
-      "no-reset-all-state-on-prop-change": 12
+      "no-reset-all-state-on-prop-change": 14
     },
     "deep": {
       "no-adjust-state-on-prop-change": 7,
       "no-chain-state-updates": 5,
       "no-derived-state": 63,
       "no-event-handler": 8,
-      "no-external-store-subscription": 10,
+      "no-external-store-subscription": 11,
       "no-initialize-state": 12,
       "no-pass-data-to-parent": 8,
       "no-pass-live-state-to-parent": 20,
-      "no-reset-all-state-on-prop-change": 12
+      "no-reset-all-state-on-prop-change": 14
     }
   },
   "flagged": {
