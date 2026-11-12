@@ -5,10 +5,10 @@
     "recommended": {
       "no-adjust-state-on-prop-change": 7,
       "no-chain-state-updates": 5,
-      "no-derived-state": 55,
+      "no-derived-state": 56,
       "no-event-handler": 8,
       "no-external-store-subscription": 10,
-      "no-initialize-state": 11,
+      "no-initialize-state": 12,
       "no-pass-data-to-parent": 7,
       "no-pass-live-state-to-parent": 18,
       "no-reset-all-state-on-prop-change": 11
@@ -19,7 +19,7 @@
       "no-derived-state": 63,
       "no-event-handler": 8,
       "no-external-store-subscription": 10,
-      "no-initialize-state": 11,
+      "no-initialize-state": 12,
       "no-pass-data-to-parent": 7,
       "no-pass-live-state-to-parent": 18,
       "no-reset-all-state-on-prop-change": 11

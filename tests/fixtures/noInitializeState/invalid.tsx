@@ -19,3 +19,11 @@ export function Initialize() {
   });
   return `${name}${label}${count}`;
 }
+
+export function AliasedSetterDeps() {
+  const [state, setState] = useState();
+  const setAlias = setState;
+  useEffect(() => {
+    setState('Hello'); // expect: noInitializeState
+  }, [setAlias]);
+}
