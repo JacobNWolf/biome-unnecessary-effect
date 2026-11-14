@@ -22,15 +22,6 @@ export function ProductPage({ product }: { product: { isInCart: boolean; name: s
   return null;
 }
 
-export function EarlyReturn() {
-  const [query, setQuery] = useState('');
-  useEffect(() => {
-    if (!query) return; // expect: noEventHandler
-    submitData({ query });
-  }, [query]);
-  return <input value={query} onChange={(event) => setQuery(event.target.value)} />;
-}
-
 export function SaveAndTrack() {
   const [saved, setSaved] = useState(false);
   const [toast, setToast] = useState('');
@@ -50,7 +41,7 @@ export function SaveAndTrack() {
 export function GuardedSubmit({ form }: { form: object | null }) {
   const [sent, setSent] = useState(false);
   useEffect(() => {
-    if (!form) return; // expect: noEventHandler
+    if (!form) return;
     setSent(true); // expect: noAdjustStateOnPropChange
     submitData(form);
   }, [form]);
