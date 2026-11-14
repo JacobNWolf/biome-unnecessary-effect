@@ -130,11 +130,15 @@ pattern written_outside_effects($target, $alias) {
     $use <: not within state_declaration($unusedState, $target, $unusedInit),
     $use <: not within `const $target = $_`,
     $use <: not within `const $alias = $target`,
-    $use <: not within `$hook($_, $_)` where {
-      $hook <: or {
-        effect_hook(),
-        layout_hook()
-      }
+    $use <: not within or {
+      `$hook($_, $_)` where {
+        $hook <: or {
+          effect_hook(),
+          layout_hook()
+        }
+      },
+      // A fourth comparator argument selects an effect hook and is excluded upstream.
+      `useCustomCompareEffect($_, $_, $_)`
     },
     $use <: not within `$hook($_)` where {
       $hook <: or {
@@ -231,6 +235,20 @@ pattern prop_or_context($scope, $params, $ref) {
   }
 }
 
+pattern parent_callback($scope, $params) {
+  or {
+    prop_or_context($scope, $params, $unusedRef),
+    prop_expression($params),
+    `$asserted!` where {
+      $asserted <: or {
+        prop_or_context($scope, $params, $unusedAsserted),
+        prop_expression($params)
+      }
+    },
+    `($object as $_).$_` where { $object <: prop_expression($params) }
+  }
+}
+
 // One-hop tracing follows props only; context values must be referenced directly.
 pattern prop_reference($scope, $local, $params, $ref) {
   $ref where {
@@ -254,8 +272,32 @@ pattern prop_reference($scope, $local, $params, $ref) {
       } until declaration_boundary(),
       and {
         or {
-          $local <: contains `const $ref = $value` until declaration_boundary(),
-          $scope <: contains `const $ref = $value` until declaration_boundary()
+          $local <: contains or {
+            `const $ref = $value`,
+            `const [$ref] = [$value]` where { $value <: prop_expression($params) },
+            `const $binding = $value` where {
+              $binding <: and { JsArrayBindingPattern(),
+              contains and { JsIdentifierBinding(),
+              $ref } until JsInitializerClause() },
+              $value <: not or {
+                use_state_call($unusedLocalInit),
+                JsArrayExpression()
+              }
+            }
+          } until declaration_boundary(),
+          $scope <: contains or {
+            `const $ref = $value`,
+            `const [$ref] = [$value]` where { $value <: prop_expression($params) },
+            `const $binding = $value` where {
+              $binding <: and { JsArrayBindingPattern(),
+              contains and { JsIdentifierBinding(),
+              $ref } until JsInitializerClause() },
+              $value <: not or {
+                use_state_call($unusedScopeInit),
+                JsArrayExpression()
+              }
+            }
+          } until declaration_boundary()
         },
         $value <: contains $source where { $source <: binding_name(), $params <: contains $source }
       }
@@ -321,7 +363,19 @@ pattern enclosing_function($name, $params, $body) {
     },
     state_declaration($unused2, $other, $init) where {
       $init <: r"[\s\S]+",
-      $body <: not contains `$other($init)` until function_node()
+      $body <: not contains `$other($reset)` where {
+        or {
+          $init <: or {
+            $reset,
+            `$reset as $_`,
+            `$reset satisfies $_`
+          },
+          $reset <: or {
+            `$init as $_`,
+            `$init satisfies $_`
+          }
+        }
+      } until function_node()
     }
   } until function_node(),
   register_diagnostic(span=$effect, message=`Avoid resetting all state when a prop changes. If "$prop" identifies the item, render this component with key={$prop} so React resets its state. If the state is a draft the user is editing, adjust it during render instead, because a new key remounts the inputs. See https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes`, severity="warn")

@@ -130,11 +130,15 @@ pattern written_outside_effects($target, $alias) {
     $use <: not within state_declaration($unusedState, $target, $unusedInit),
     $use <: not within `const $target = $_`,
     $use <: not within `const $alias = $target`,
-    $use <: not within `$hook($_, $_)` where {
-      $hook <: or {
-        effect_hook(),
-        layout_hook()
-      }
+    $use <: not within or {
+      `$hook($_, $_)` where {
+        $hook <: or {
+          effect_hook(),
+          layout_hook()
+        }
+      },
+      // A fourth comparator argument selects an effect hook and is excluded upstream.
+      `useCustomCompareEffect($_, $_, $_)`
     },
     $use <: not within `$hook($_)` where {
       $hook <: or {
@@ -231,6 +235,20 @@ pattern prop_or_context($scope, $params, $ref) {
   }
 }
 
+pattern parent_callback($scope, $params) {
+  or {
+    prop_or_context($scope, $params, $unusedRef),
+    prop_expression($params),
+    `$asserted!` where {
+      $asserted <: or {
+        prop_or_context($scope, $params, $unusedAsserted),
+        prop_expression($params)
+      }
+    },
+    `($object as $_).$_` where { $object <: prop_expression($params) }
+  }
+}
+
 // One-hop tracing follows props only; context values must be referenced directly.
 pattern prop_reference($scope, $local, $params, $ref) {
   $ref where {
@@ -254,8 +272,32 @@ pattern prop_reference($scope, $local, $params, $ref) {
       } until declaration_boundary(),
       and {
         or {
-          $local <: contains `const $ref = $value` until declaration_boundary(),
-          $scope <: contains `const $ref = $value` until declaration_boundary()
+          $local <: contains or {
+            `const $ref = $value`,
+            `const [$ref] = [$value]` where { $value <: prop_expression($params) },
+            `const $binding = $value` where {
+              $binding <: and { JsArrayBindingPattern(),
+              contains and { JsIdentifierBinding(),
+              $ref } until JsInitializerClause() },
+              $value <: not or {
+                use_state_call($unusedLocalInit),
+                JsArrayExpression()
+              }
+            }
+          } until declaration_boundary(),
+          $scope <: contains or {
+            `const $ref = $value`,
+            `const [$ref] = [$value]` where { $value <: prop_expression($params) },
+            `const $binding = $value` where {
+              $binding <: and { JsArrayBindingPattern(),
+              contains and { JsIdentifierBinding(),
+              $ref } until JsInitializerClause() },
+              $value <: not or {
+                use_state_call($unusedScopeInit),
+                JsArrayExpression()
+              }
+            }
+          } until declaration_boundary()
         },
         $value <: contains $source where { $source <: binding_name(), $params <: contains $source }
       }
@@ -302,7 +344,10 @@ or {
   `if ($test) return;`
 } as $if where {
   $if <: not contains JsElseClause() until JsBlockStatement(),
-  $if <: within `$hook($cb, $deps)` where { $hook <: effect_hook() },
+  $if <: within or {
+    `$hook($cb, $deps)` where { $hook <: effect_hook() },
+    `useCustomCompareEffect($cb, $deps, $comparator)`
+  },
   $cb <: sync_callback($body),
   $body <: contains $if until function_node(),
   $body <: not contains cleanup_return() until function_node(),

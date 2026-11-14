@@ -7,3 +7,11 @@ export function useSelection({ items }: { items: string[] }) {
   }, [items]);
   return selection;
 }
+
+export function DifferentAssertedReset({ id }) {
+ const [user, setUser] = useState(null as string | null);
+ useEffect(() => {
+  setUser("other"); // expect: noAdjustStateOnPropChange
+ }, [id]);
+ return user;
+}
