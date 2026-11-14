@@ -37,7 +37,7 @@ export function ValueLess() {
   const [, setAttempts] = useState(0);
   const [count] = useState(0);
   useEffect(() => {
-    setAttempts((prev) => prev + count); // expect: noDerivedState, noDerivedStateDeep
+    setAttempts((prev) => prev + count);
   }, [count]);
 }
 
@@ -72,7 +72,7 @@ export function DirectAlias() {
   const [data, setData] = useState();
   const setDataWrapper = setData;
   useEffect(() => {
-    setDataWrapper(data); // expect: noDerivedState, noDerivedStateDeep
+    setDataWrapper(data);
   }, [data]);
 }
 

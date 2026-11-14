@@ -155,7 +155,7 @@ pattern binding_name() {
 }
 
 // Tracing follows one hop through component/effect locals, excluding other nested functions.
-pattern reads_state($scope, $local) {
+pattern reads_state($scope, $local, $source) {
   $value where {
     $scope <: contains or {
       `const [$source, $_] = $init`,
@@ -398,6 +398,14 @@ pattern reads_dom() {
     `new IntersectionObserver($_)`,
     `new IntersectionObserver($_, $_)`,
     `new MutationObserver($_)`
+  }
+}
+
+// Calls inside setter arguments compute the next value rather than synchronize an external system.
+pattern side_effect_call($component) {
+  JsCallExpression() as $call where {
+    $call <: not within `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) },
+    $call <: not `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) }
   }
 }
 

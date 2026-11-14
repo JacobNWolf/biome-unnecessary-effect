@@ -157,7 +157,7 @@ pattern binding_name() {
 }
 
 // Tracing follows one hop through component/effect locals, excluding other nested functions.
-pattern reads_state($scope, $local) {
+pattern reads_state($scope, $local, $source) {
   $value where {
     $scope <: contains or {
       `const [$source, $_] = $init`,
@@ -403,6 +403,14 @@ pattern reads_dom() {
   }
 }
 
+// Calls inside setter arguments compute the next value rather than synchronize an external system.
+pattern side_effect_call($component) {
+  JsCallExpression() as $call where {
+    $call <: not within `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) },
+    $call <: not `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) }
+  }
+}
+
 pattern enclosing_function($name, $params, $body) {
   and { or {
     JsFunctionDeclaration(),
@@ -437,6 +445,8 @@ pattern enclosing_function($name, $params, $body) {
   $body <: not contains cleanup_return() until function_node(),
   $call <: within enclosing_function($unused1, $params, $component),
   $setter <: state_setter($component, $state, $setter, $original),
+  $arg <: not contains function_node() until JsCallExpression(),
+  $arg <: not reads_state($component, $body, $state),
   $component <: not written_outside_effects($setter, $original),
   or {
     $original <: $setter,
