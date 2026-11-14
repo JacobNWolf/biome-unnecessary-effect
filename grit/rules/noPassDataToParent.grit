@@ -477,7 +477,12 @@ pattern enclosing_function($name, $params, $body) {
         `useMemo`,
         `useReducer`,
         `useEffectEvent`,
-        `useId`
+        `useId`,
+        `useEditor`,
+        `useFetcher`,
+        `useNavigate`,
+        `useForm`,
+        `useQueryClient`
       },
       // Hooks fed local state return live state, handled by noPassLiveStateToParent.
       $hookArgs <: not reads_state($component, $body)

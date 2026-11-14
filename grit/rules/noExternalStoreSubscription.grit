@@ -458,6 +458,15 @@ pattern enclosing_function($name, $params, $body) {
       } as $sync until function_node()
     },
     and {
+      $body <: contains or {
+        `$_.subscribe($_)`,
+        `$_.subscribe($_, $_)`,
+        `$_.addEventListener($_, $_)`,
+        `$_.addEventListener($_, $_, $_)`,
+        `$_.on($_, $_)`,
+        `$_.listen($_)`,
+        `const $unsubscribe = $subscribe($args)` where { $cleanup <: contains `$unsubscribe()` }
+      } until function_node(),
       $cleanup <: contains `$setter($_)` where { $setter <: state_setter($component, $state, $setter) },
       $body <: contains or {
         `$setter($_)`,

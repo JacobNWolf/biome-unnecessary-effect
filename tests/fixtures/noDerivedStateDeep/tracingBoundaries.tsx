@@ -43,7 +43,7 @@ export function CleanupWriter({ value }: { value: string }) {
     setResult(value); // expect: noDerivedState
   }, [value]);
   useEffect(() => {
-    setResult('external'); // expect: noExternalStoreSubscription
+    setResult('external');
     return () => setResult('');
   }, []);
   return result;
