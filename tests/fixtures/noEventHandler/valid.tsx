@@ -31,7 +31,7 @@ export function Drafts({ flights }: { flights: string[] }) {
   useEffect(() => {
     if (flights.length > 0 && !initialized.current) {
       initialized.current = true;
-      setDrafts(flights.map((flight) => flight.trim())); // expect: noDerivedState, noDerivedStateDeep
+      setDrafts(flights.map((flight) => flight.trim()));
     }
   }, [flights]);
   return drafts;

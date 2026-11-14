@@ -306,10 +306,34 @@ pattern prop_reference($scope, $local, $params, $ref) {
 // Bare `return;` exits early and must not count as cleanup.
 pattern cleanup_return() { `return $value` where { $value <: r"[\s\S]+" } }
 
-// DOM nodes and layout exist only after commit, so effects that read them can't move into render.
+// Browser state and DOM nodes are external to React's render.
+pattern syncs_with_browser() {
+  contains or {
+    `$_.current`,
+    `$_.current = $_`,
+    `new ResizeObserver($_)`,
+    `new IntersectionObserver($_)`,
+    `new IntersectionObserver($_, $_)`,
+    `new MutationObserver($_)`,
+    `window.$_`,
+    `document.$_`,
+    `localStorage.$_`,
+    `sessionStorage.$_`,
+    `navigator.$_`,
+    `requestAnimationFrame($_)`,
+    `cancelAnimationFrame($_)`,
+    `$_.scrollIntoView()`,
+    `$_.scrollIntoView($_)`,
+    `$_.scrollTo($_)`,
+    `$_.scrollTo($_, $_)`,
+    `$_.focus()`
+  }
+}
+
 pattern reads_dom() {
   contains or {
     `$_.current`,
+    `$_.current = $_`,
     `new ResizeObserver($_)`,
     `new IntersectionObserver($_)`,
     `new IntersectionObserver($_, $_)`,

@@ -18,11 +18,21 @@ const EFFECT_WRAPPERS: Record<string, Set<string> | undefined> = {
 };
 const LAYOUT_HOOKS = new Set(['useLayoutEffect', 'useInsertionEffect']);
 const COMPONENT_OR_HOOK = /^(?:[A-Z]|use[A-Z])/;
+const BROWSER_GLOBALS = new Set([
+  'window',
+  'document',
+  'localStorage',
+  'sessionStorage',
+  'navigator',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+]);
 
 export type Source =
   | { kind: 'state'; name: string }
   | { kind: 'setter'; state: string; binding: Binding }
-  | { kind: 'prop'; name: string };
+  | { kind: 'prop'; name: string }
+  | { kind: 'external' };
 
 const isFunction = (node: AnyJsAstNode | undefined) =>
   node?.kind === 'JS_ARROW_FUNCTION_EXPRESSION' ||
@@ -185,6 +195,7 @@ export const upstream = (model: SemanticModel, node: AnyJsAstNode, constAliasesO
   const trace = (node: AnyJsAstNode, skipCallArguments = false): Source[] =>
     references(node, skipCallArguments).flatMap((reference) => {
       const binding = model.binding(reference);
+      if (!binding && BROWSER_GLOBALS.has(reference.text)) return [{ kind: 'external' }];
       const key = binding && nodeKey(binding.syntax());
       if (!binding || !key || seen.has(key)) return [];
       seen.add(key);
@@ -304,4 +315,22 @@ export const hasCleanup = (fn: AnyJsAstNode): boolean => {
   const visit = (node: AnyJsAstNode): boolean =>
     !isFunction(node) && ((node.kind === 'JS_RETURN_STATEMENT' && !!node.argument) || node.children().some(visit));
   return visit(body);
+};
+
+export const syncsWithBrowser = (model: SemanticModel, fn: AnyJsAstNode): boolean => {
+  const visit = (node: AnyJsAstNode): boolean =>
+    !isFunction(node) &&
+    (((node.kind === 'JS_STATIC_MEMBER_EXPRESSION' || node.kind === 'JS_STATIC_MEMBER_ASSIGNMENT') &&
+      node.member?.text === 'current') ||
+      (node.kind === 'JS_CALL_EXPRESSION' &&
+        node.callee?.kind === 'JS_STATIC_MEMBER_EXPRESSION' &&
+        ['scrollIntoView', 'scrollTo', 'focus'].includes(node.callee.member?.text ?? '')) ||
+      node.children().some(visit));
+  const body = bodyOf(fn);
+  return (
+    !!body &&
+    (visit(body) ||
+      upstream(model, body).some((source) => source.kind === 'external') ||
+      synchronousCalls(model, fn).some(({ call }) => visit(call)))
+  );
 };
