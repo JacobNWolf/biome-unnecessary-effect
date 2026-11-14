@@ -20,11 +20,21 @@ jobs:
       - name: Install npm with staged publishing support
         run: npm install --global npm@11.21.1
 
-      - name: Check the release tag matches package.json
+      - name: Validate release metadata
+        env:
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
           version="$(node -p "require('./package.json').version")"
           if [ "$GITHUB_REF_NAME" != "v$version" ]; then
             echo "Release tag $GITHUB_REF_NAME doesn't match package.json version $version" >&2
+            exit 1
+          fi
+          prerelease=false
+          if [[ "${version%%+*}" == *-* ]]; then
+            prerelease=true
+          fi
+          if [ "$RELEASE_PRERELEASE" != "$prerelease" ]; then
+            echo "GitHub prerelease flag must be $prerelease for package.json version $version" >&2
             exit 1
           fi
 
@@ -35,4 +45,4 @@ jobs:
         run: bun test
 
       - name: Stage package on npm
-        run: npm stage publish --access public ${{ github.event.release.prerelease && '--tag next' || '' }}
+        run: npm stage publish --access public --tag ${{ github.event.release.prerelease && 'next' || 'latest' }}
