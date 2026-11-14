@@ -75,6 +75,39 @@ const lint = (rulePath: string) => {
 };
 
 describe(`rules (Biome ${BIOME_VERSION})`, () => {
+  test('all-state reset checks stay bounded with many state declarations', () => {
+    const work = mkdtempSync(join(tmpdir(), 'bue-many-states-'));
+    writeFileSync(
+      join(work, 'biome.json'),
+      JSON.stringify({
+        plugins: [join(RULES_DIR, 'noResetAllStateOnPropChange.grit')],
+      }),
+    );
+    const declarations = Array.from(
+      { length: 64 },
+      (_, index) => `const [value${index}, setValue${index}] = useState(0);`,
+    ).join('\n');
+    writeFileSync(
+      join(work, 'case.tsx'),
+      `
+      function ManyFields({ id }) {
+        ${declarations}
+        useEffect(() => { setValue0(0); }, [id]);
+        return value0;
+      }
+    `,
+    );
+    const result = Bun.spawnSync([BIOME_BIN, 'lint', '--reporter=json', '--config-path', work, 'case.tsx'], {
+      cwd: work,
+      timeout: 10_000,
+    });
+    expect(result.exitedDueToTimeout).toBe(false);
+    const text = result.stdout.toString();
+    const report: { diagnostics: Diagnostic[] } = JSON.parse(text.slice(text.indexOf('{')));
+    expect(report.diagnostics.filter((d) => d.message.includes('during loading of plugins'))).toEqual([]);
+    expect(report.diagnostics.filter((d) => d.category === 'plugin')).toEqual([]);
+  }, 15_000);
+
   for (const rule of rules) {
     test(rule.name, () => {
       const diagnostics = lint(rule.path);
@@ -92,6 +125,12 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
           ({ location }) => location.path.endsWith('selfDependent.tsx') && location.start.line === 33,
         );
         expect(chain?.message).toContain('changes "other"');
+      }
+      if (rule.name === 'noResetAllStateOnPropChange') {
+        const generic = diagnostics.find(({ location }) => location.path.endsWith('keyAdvice.tsx'));
+        expect(generic?.message).toContain('a key that identifies the item');
+        expect(generic?.message).not.toContain('key={data}');
+        expect(diagnostics.some(({ message }) => message.includes('key={userId}'))).toBe(true);
       }
     });
   }

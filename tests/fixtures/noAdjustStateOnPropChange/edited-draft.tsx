@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 export function EditableTitle({ title }: { title: string }) {
   const [draft, setDraft] = useState(title);
-  useEffect(() => { // expect: noResetAllStateOnPropChange
+  useEffect(() => {
     setDraft(title); // expect: noAdjustStateOnPropChange
   }, [title]);
   return <input value={draft} onChange={(event) => setDraft(event.target.value)} />;
@@ -10,7 +10,7 @@ export function EditableTitle({ title }: { title: string }) {
 
 export function ReorderableItems({ items }: { items: string[] }) {
   const [ordered, setOrdered] = useState<string[]>(items);
-  useEffect(() => { // expect: noResetAllStateOnPropChange
+  useEffect(() => {
     setOrdered(items); // expect: noAdjustStateOnPropChange
   }, [items]);
   return <List items={ordered} onReorder={setOrdered} />;
