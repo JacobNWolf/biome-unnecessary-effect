@@ -65,3 +65,91 @@ export function HookzDerived({ value }) {
   }, [value], cmp, useLayoutEffect);
   return result;
 }
+
+export function HelperAlsoUsedInHandler({ value }) {
+  const [result, setResult] = useState('');
+  const apply = () => setResult(value);
+  useEffect(() => {
+    apply();
+  }, [value]);
+  return <button onClick={() => apply()}>{result}</button>;
+}
+
+export function AsyncHelper({ value }) {
+  const [result, setResult] = useState('');
+  const apply = async () => setResult(value);
+  useEffect(() => {
+    apply();
+  }, [value]);
+  return result;
+}
+
+export function LetHelper({ value }) {
+  const [result, setResult] = useState('');
+  let apply = () => setResult(value);
+  useEffect(() => {
+    apply(); // expect: noDerivedStateDeep
+  }, [value]);
+  return result;
+}
+
+export function MountHelper({ value }) {
+  const [result, setResult] = useState('');
+  const apply = () => setResult(value);
+  useEffect(() => {
+    apply();
+  }, []);
+  return result;
+}
+
+export function HelperWithLocalArguments() {
+  const [result, setResult] = useState('');
+  const local = 'fixed';
+  const apply = (value) => setResult(value);
+  useEffect(() => {
+    apply(local);
+  }, [local]);
+  return result;
+}
+
+export function ComponentHelper({ value }) {
+  const [result, setResult] = useState('');
+  function apply() {
+    setResult(value);
+  }
+  useEffect(() => {
+    apply(); // expect: noDerivedStateDeep
+  }, [value]);
+  return result;
+}
+
+export function SetterWrapper({ value }) {
+  const [result, setResult] = useState('');
+  const set = (next) => setResult(next);
+  useEffect(() => {
+    set(value); // expect: noDerivedStateDeep
+  }, [value]);
+  return result;
+}
+
+export function ReferencedHelper({ value }) {
+  const [result, setResult] = useState('');
+  function apply() {
+    setResult(value); // expect: noDerivedStateDeep
+  }
+  useEffect(apply, [value]);
+  return result;
+}
+
+export function HelperReadingLocalState() {
+  const [source] = useState('');
+  const [result, setResult] = useState('');
+  function apply() {
+    const next = source.toUpperCase();
+    setResult(next);
+  }
+  useEffect(() => {
+    apply(); // expect: noDerivedStateDeep
+  }, [source]);
+  return result;
+}

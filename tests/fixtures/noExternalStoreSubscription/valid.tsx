@@ -77,3 +77,13 @@ export function Confirmation() {
   }, [moved]);
   return moved;
 }
+
+export function useLetAliasedCount(store: { read: () => number }) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let update = setCount;
+    update(store.read());
+    return () => setCount(0);
+  }, []);
+  return count;
+}
