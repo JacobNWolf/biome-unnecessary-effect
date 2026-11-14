@@ -45,7 +45,7 @@ export function ObjectFromCall({ posts }) {
   const [result, setResult] = useState();
   useEffect(() => {
     const { second } = selectPosts(posts);
-    setResult(second); // expect: noAdjustStateOnPropChange
+    setResult(second); // expect: noAdjustStateOnPropChange, noDerivedStateDeep
   }, [posts]);
   return result;
 }
