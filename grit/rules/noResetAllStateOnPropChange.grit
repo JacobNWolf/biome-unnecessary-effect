@@ -440,8 +440,16 @@ pattern enclosing_function($name, $params, $body) {
 `$hook($cb, $deps)` as $effect where {
   $hook <: effect_hook(),
   $cb <: sync_callback($body),
+  $body <: not contains cleanup_return() until function_node(),
   $effect <: within enclosing_function($name, $params, $component),
   $name <: r"[A-Z][A-Za-z0-9_]*",
+  // Keep cardinality captures out of the reset search to avoid retrying every pair of states.
+  not not and {
+    $component <: contains state_declaration($firstState, $firstSetter, $firstInit) until declaration_boundary(),
+    $component <: contains state_declaration($secondState, $secondSetter, $secondInit) where {
+      $secondSetter <: not $firstSetter
+    } until declaration_boundary()
+  },
   or {
     $body <: contains `$setter($_)` where {
       $setter <: state_setter($component, $unused1, $setter)
@@ -465,6 +473,17 @@ pattern enclosing_function($name, $params, $body) {
     } until function_node()
   },
   $deps <: contains prop_or_context($component, $params, $prop),
+  $prop <: not r"(?:is|has|should|show|can)(?:[A-Z_][A-Za-z0-9_]*|$)",
+  or {
+    and {
+      $prop <: r"(?:id|key|slug|uuid|[A-Za-z_$][A-Za-z0-9_$]*(?:Id|Key))",
+      $keyAdvice = `If "$prop" identifies the item, render this component with key={$prop} so React resets its state.`
+    },
+    and {
+      $prop <: not r"(?:id|key|slug|uuid|[A-Za-z_$][A-Za-z0-9_$]*(?:Id|Key))",
+      $keyAdvice = `Render this component with a key that identifies the item, such as its id, so React resets its state.`
+    }
+  },
   // `useState()` starts as undefined, so `setX()` and `setX(undefined)` both reset it.
   $component <: not contains or {
     `const [$_] = $call` where { $call <: use_state_call($unused3) },
@@ -513,5 +532,5 @@ pattern enclosing_function($name, $params, $body) {
       } until function_node()
     }
   } until declaration_boundary(),
-  register_diagnostic(span=$effect, message=`Avoid resetting all state when a prop changes. If "$prop" identifies the item, render this component with key={$prop} so React resets its state. If the state is a draft the user is editing, adjust it during render instead, because a new key remounts the inputs. See https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes`, severity="warn")
+  register_diagnostic(span=$effect, message=`Avoid resetting all state when a prop changes. $keyAdvice If the state is a draft the user is editing, adjust it during render instead, because a new key remounts the inputs. See https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes`, severity="warn")
 }

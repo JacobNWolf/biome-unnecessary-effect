@@ -11,7 +11,7 @@
       "no-initialize-state": 12,
       "no-pass-data-to-parent": 8,
       "no-pass-live-state-to-parent": 20,
-      "no-reset-all-state-on-prop-change": 14
+      "no-reset-all-state-on-prop-change": 6
     },
     "deep": {
       "no-adjust-state-on-prop-change": 7,
@@ -22,7 +22,7 @@
       "no-initialize-state": 12,
       "no-pass-data-to-parent": 8,
       "no-pass-live-state-to-parent": 20,
-      "no-reset-all-state-on-prop-change": 14
+      "no-reset-all-state-on-prop-change": 6
     }
   },
   "flagged": {
