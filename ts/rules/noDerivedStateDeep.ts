@@ -26,8 +26,9 @@ export const noDerivedStateDeep = defineRule({
       return;
 
     for (const { call, origin } of synchronousCalls(model, effect.callback)) {
-      if (!call.callee) continue;
-      const setter = upstream(model, call.callee, true).find((source) => source.kind === 'setter');
+      const callee = unwrap(call.callee);
+      if (callee?.kind !== 'JS_IDENTIFIER_EXPRESSION') continue;
+      const setter = upstream(model, callee, true).find((source) => source.kind === 'setter');
       if (!setter || writtenOutsideEffects(model, setter.binding)) continue;
       if (isFunction(unwrap(call.arguments?.args[0]))) continue;
       const reads = call.arguments ? upstream(model, call.arguments) : [];
