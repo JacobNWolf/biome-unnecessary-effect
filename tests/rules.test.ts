@@ -83,6 +83,10 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
 
       // An unbound metavariable leaks into the message as literal `$name` text.
       for (const { message } of diagnostics) expect(message).not.toMatch(/\$[a-z_]/i);
+      if (rule.name === 'noAdjustStateOnPropChange') {
+        const adjustment = diagnostics.find(({ location }) => location.path.endsWith('triggerBindings.tsx'));
+        expect(adjustment?.message).toContain('when "isOpen" changes');
+      }
     });
   }
 });

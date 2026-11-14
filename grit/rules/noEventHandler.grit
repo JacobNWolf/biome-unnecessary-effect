@@ -206,14 +206,22 @@ pattern prop_expression($params) {
   or {
     `$object.$_`,
     $object
-  } where { $object <: binding_name(), $params <: contains $object }
+  } where {
+    $object <: binding_name(),
+    $params <: contains and { JsIdentifierBinding(),
+    $object } until JsInitializerClause()
+  }
 }
 
 pattern prop_or_context($scope, $params, $ref) {
   $ref where {
     $ref <: binding_name(),
     or {
-      $params <: contains $ref,
+      $params <: contains and { JsIdentifierBinding(),
+      $ref } until JsInitializerClause(),
+      $scope <: contains `const [$ref] = [$value]` where {
+        $value <: prop_expression($params)
+      } until declaration_boundary(),
       $scope <: contains `const $binding = $value` where {
         $binding <: or {
           $ref,
@@ -228,7 +236,8 @@ pattern prop_or_context($scope, $params, $ref) {
           `useContext($_)`,
           `React.useContext($_)`,
           prop_expression($params),
-          contains `$prop($_)` where { $prop <: prop_expression($params) }
+          and { function_node(),
+          contains `$prop($_)` where { $prop <: prop_expression($params) } }
         }
       } until declaration_boundary()
     }
@@ -254,7 +263,8 @@ pattern prop_reference($scope, $local, $params, $ref) {
   $ref where {
     $ref <: binding_name(),
     or {
-      $params <: contains $ref,
+      $params <: contains and { JsIdentifierBinding(),
+      $ref } until JsInitializerClause(),
       $scope <: contains `const $binding = $context` where {
         $context <: or {
           `useContext($_)`,
@@ -299,7 +309,11 @@ pattern prop_reference($scope, $local, $params, $ref) {
             }
           } until declaration_boundary()
         },
-        $value <: contains $source where { $source <: binding_name(), $params <: contains $source }
+        $value <: contains $source where {
+          $source <: binding_name(),
+          $params <: contains and { JsIdentifierBinding(),
+          $source } until JsInitializerClause()
+        }
       }
     }
   }
@@ -448,7 +462,7 @@ or {
       $message = `Avoid using state and an effect as an event handler. Run the code that depends on "$ref" from the event handler that sets it instead. See https://react.dev/learn/you-might-not-need-an-effect#sharing-logic-between-event-handlers`
     },
     and {
-      $test <: contains prop_reference($component, $body, $params, $ref),
+      $test <: contains prop_or_context($component, $params, $ref),
       $message = `Avoid using props and an effect as an event handler. Move the code that depends on "$ref" to the parent's event handler instead. See https://react.dev/learn/you-might-not-need-an-effect#sharing-logic-between-event-handlers`
     }
   },
