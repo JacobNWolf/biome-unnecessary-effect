@@ -309,6 +309,39 @@ pattern prop_reference($scope, $local, $params, $ref) {
 pattern cleanup_return() { `return $value` where { $value <: r"[\s\S]+" } }
 
 // Browser state and DOM nodes are external to React's render.
+pattern browser_global() {
+  $global where {
+    $global <: r"window|document|localStorage|sessionStorage|navigator|requestAnimationFrame|cancelAnimationFrame",
+    $program <: not contains and { JsIdentifierBinding(),
+    $global } until or {
+      function_node(),
+      JsBlockStatement()
+    },
+    $global <: not within or {
+      `($params) => $scope`,
+      `function $_($params) { $scope }`,
+      `function ($params) { $scope }`
+    } where {
+      or {
+        $params <: contains and { JsIdentifierBinding(),
+        $global } until JsInitializerClause(),
+        $scope <: contains and { JsIdentifierBinding(),
+        $global } until or {
+          function_node(),
+          JsBlockStatement()
+        }
+      }
+    },
+    $global <: not within `{ $scope }` where {
+      $scope <: contains and { JsIdentifierBinding(),
+      $global } until or {
+        function_node(),
+        JsBlockStatement()
+      }
+    }
+  }
+}
+
 pattern syncs_with_browser() {
   contains or {
     `$_.current`,
@@ -317,18 +350,14 @@ pattern syncs_with_browser() {
     `new IntersectionObserver($_)`,
     `new IntersectionObserver($_, $_)`,
     `new MutationObserver($_)`,
-    `window.$_`,
-    `document.$_`,
-    `localStorage.$_`,
-    `sessionStorage.$_`,
-    `navigator.$_`,
-    `requestAnimationFrame($_)`,
-    `cancelAnimationFrame($_)`,
+    `$browser.$_` where { $browser <: browser_global() },
+    `$browser($_)` where { $browser <: r"requestAnimationFrame|cancelAnimationFrame", $browser <: browser_global() },
     `$_.scrollIntoView()`,
     `$_.scrollIntoView($_)`,
     `$_.scrollTo($_)`,
     `$_.scrollTo($_, $_)`,
-    `$_.focus()`
+    `$_.focus()`,
+    `$_.focus($_)`
   }
 }
 

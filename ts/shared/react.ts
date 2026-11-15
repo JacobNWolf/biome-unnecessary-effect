@@ -318,19 +318,33 @@ export const hasCleanup = (fn: AnyJsAstNode): boolean => {
 };
 
 export const syncsWithBrowser = (model: SemanticModel, fn: AnyJsAstNode): boolean => {
-  const visit = (node: AnyJsAstNode): boolean =>
-    !isFunction(node) &&
-    (((node.kind === 'JS_STATIC_MEMBER_EXPRESSION' || node.kind === 'JS_STATIC_MEMBER_ASSIGNMENT') &&
-      node.member?.text === 'current') ||
-      (node.kind === 'JS_CALL_EXPRESSION' &&
-        node.callee?.kind === 'JS_STATIC_MEMBER_EXPRESSION' &&
-        ['scrollIntoView', 'scrollTo', 'focus'].includes(node.callee.member?.text ?? '')) ||
-      node.children().some(visit));
+  const seen = new Set([nodeKey(fn)]);
+  const visit = (node: AnyJsAstNode): boolean => {
+    if (isFunction(node)) return false;
+    if (node.kind === 'JS_REFERENCE_IDENTIFIER' && BROWSER_GLOBALS.has(node.text) && !model.binding(node)) return true;
+    if (
+      (node.kind === 'JS_STATIC_MEMBER_EXPRESSION' || node.kind === 'JS_STATIC_MEMBER_ASSIGNMENT') &&
+      node.member?.text === 'current'
+    )
+      return true;
+    if (node.kind === 'JS_CALL_EXPRESSION') {
+      const callee = unwrap(node.callee);
+      if (
+        callee?.kind === 'JS_STATIC_MEMBER_EXPRESSION' &&
+        ['scrollIntoView', 'scrollTo', 'focus'].includes(callee.member?.text ?? '')
+      )
+        return true;
+      const binding =
+        callee?.kind === 'JS_IDENTIFIER_EXPRESSION' && callee.name ? model.binding(callee.name) : undefined;
+      const helper = binding && functionOf(binding);
+      if (helper && !isAsync(helper) && !seen.has(nodeKey(helper))) {
+        seen.add(nodeKey(helper));
+        const body = bodyOf(helper);
+        if (body && visit(body)) return true;
+      }
+    }
+    return node.children().some(visit);
+  };
   const body = bodyOf(fn);
-  return (
-    !!body &&
-    (visit(body) ||
-      upstream(model, body).some((source) => source.kind === 'external') ||
-      synchronousCalls(model, fn).some(({ call }) => visit(call)))
-  );
+  return !!body && (visit(body) || upstream(model, body).some((source) => source.kind === 'external'));
 };
