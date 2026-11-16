@@ -311,11 +311,18 @@ pattern cleanup_return() { `return $value` where { $value <: r"[\s\S]+" } }
 pattern browser_global_binding($global, $reference) {
   and { JsIdentifierBinding(),
   $global } as $binding where {
+    // Biome 2.4.5 cannot compile initializer field matchers on for-in/of nodes.
     $binding <: not within or {
-      JsForStatement(initializer=$initializer),
-      JsForInStatement(initializer=$initializer),
-      JsForOfStatement(initializer=$initializer)
-    } as $loop where { $initializer <: r"^(?:const|let)\b[\s\S]*", $reference <: not within $loop }
+      JsVariableDeclaration(),
+      JsForVariableDeclaration()
+    } as $declaration where {
+      $declaration <: r"^(?:const|let)\b[\s\S]*",
+      $declaration <: within or {
+        JsForStatement(),
+        JsForInStatement(),
+        JsForOfStatement()
+      } as $loop where { $reference <: not within $loop }
+    }
   }
 }
 
