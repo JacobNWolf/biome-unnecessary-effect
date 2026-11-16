@@ -167,7 +167,8 @@ pattern reads_state($scope, $local, $source) {
       or {
         $value <: or {
           $source,
-          contains $source
+          contains and { JsReferenceIdentifier(),
+          $source }
         },
         $local <: contains or {
           `const $alias = $aliasValue`,
@@ -176,9 +177,11 @@ pattern reads_state($scope, $local, $source) {
           $alias <: binding_name(),
           $value <: or {
             $alias,
-            contains $alias
+            contains and { JsReferenceIdentifier(),
+            $alias }
           },
-          $aliasValue <: contains $source
+          $aliasValue <: contains and { JsReferenceIdentifier(),
+          $source }
         } until declaration_boundary(),
         $scope <: contains or {
           `const $alias = $aliasValue`,
@@ -187,9 +190,11 @@ pattern reads_state($scope, $local, $source) {
           $alias <: binding_name(),
           $value <: or {
             $alias,
-            contains $alias
+            contains and { JsReferenceIdentifier(),
+            $alias }
           },
-          $aliasValue <: contains $source
+          $aliasValue <: contains and { JsReferenceIdentifier(),
+          $source }
         } until declaration_boundary()
       }
     } until declaration_boundary()
