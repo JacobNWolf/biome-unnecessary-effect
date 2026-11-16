@@ -322,6 +322,16 @@ export const syncsWithBrowser = (model: SemanticModel, fn: AnyJsAstNode): boolea
   const visit = (node: AnyJsAstNode): boolean => {
     if (isFunction(node)) return false;
     if (node.kind === 'JS_REFERENCE_IDENTIFIER' && BROWSER_GLOBALS.has(node.text) && !model.binding(node)) return true;
+    if (node.kind === 'JS_NEW_EXPRESSION') {
+      const callee = unwrap(node.callee);
+      if (
+        callee?.kind === 'JS_IDENTIFIER_EXPRESSION' &&
+        ['ResizeObserver', 'IntersectionObserver', 'MutationObserver'].includes(callee.text) &&
+        callee.name &&
+        !model.binding(callee.name)
+      )
+        return true;
+    }
     if (
       (node.kind === 'JS_STATIC_MEMBER_EXPRESSION' || node.kind === 'JS_STATIC_MEMBER_ASSIGNMENT') &&
       node.member?.text === 'current'

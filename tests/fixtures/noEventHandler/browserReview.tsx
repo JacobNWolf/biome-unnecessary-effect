@@ -67,6 +67,79 @@ export function UnrelatedShadow({ active }: { active: boolean }) {
   return describe({ name: 'draft' });
 }
 
+export function SiblingLoopShadow() {
+  const [name, setName] = useState('');
+  for (const document of [{ title: 'draft' }]) {
+    console.log(document.title);
+  }
+  useEffect(() => {
+    for (const document of [{ title: 'draft' }]) {
+      console.log(document.title);
+    }
+    for (const document in { draft: true }) {
+      console.log(document.length);
+    }
+    for (let document = 0; document < 1; document++) {
+      console.log(document);
+    }
+    setName(document.title);
+  }, []);
+  return name;
+}
+
+export function LoopLocalDocument() {
+  const [name, setName] = useState('');
+  useEffect(() => {
+    for (const document of [{ title: 'draft' }]) {
+      setName(document.title); // expect: noInitializeState
+    }
+    for (const document in { draft: true }) {
+      setName(document); // expect: noInitializeState
+    }
+    for (let document = 0; document < 1; document++) {
+      setName(String(document)); // expect: noInitializeState
+    }
+  }, []);
+  return name;
+}
+
+export function FunctionScopedLoopDocument() {
+  const [name, setName] = useState('');
+  useEffect(() => {
+    for (var document of [{ title: 'draft' }]) {
+      console.log(document.title);
+    }
+    setName(document.title); // expect: noInitializeState
+  }, []);
+  return name;
+}
+
+export function NestedDocumentProp(props: { active: boolean; document: { title: string } }) {
+  useEffect(() => {
+    if (props.active) { // expect: noEventHandler
+      console.log(props.document.title);
+    }
+  }, [props]);
+}
+
+export function DocumentWrite({ value }: { value: string }) {
+  const [name, setName] = useState('');
+  useEffect(() => {
+    document.title = value;
+    setName(value);
+  }, [value]);
+  return name;
+}
+
+export function ShadowedDocumentWrite({ value, document }: { value: string; document: { title: string } }) {
+  const [name, setName] = useState('');
+  useEffect(() => {
+    document.title = value;
+    setName(value); // expect: noDerivedState, noDerivedStateDeep
+  }, [value, document]);
+  return name;
+}
+
 function readStored(key: string) {
   return JSON.parse(localStorage.getItem(key) ?? 'null');
 }

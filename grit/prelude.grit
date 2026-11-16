@@ -306,12 +306,23 @@ pattern prop_reference($scope, $local, $params, $ref) {
 // Bare `return;` exits early and must not count as cleanup.
 pattern cleanup_return() { `return $value` where { $value <: r"[\s\S]+" } }
 
+pattern browser_global_binding($global, $reference) {
+  and { JsIdentifierBinding(),
+  $global } as $binding where {
+    $binding <: not within or {
+      JsForStatement(initializer=$initializer),
+      JsForInStatement(initializer=$initializer),
+      JsForOfStatement(initializer=$initializer)
+    } as $loop where { $initializer <: r"^(?:const|let)\b[\s\S]*", $reference <: not within $loop }
+  }
+}
+
 // Browser state and DOM nodes are external to React's render.
 pattern browser_global() {
-  $global where {
-    $global <: r"window|document|localStorage|sessionStorage|navigator|requestAnimationFrame|cancelAnimationFrame",
-    $program <: not contains and { JsIdentifierBinding(),
-    $global } until or {
+  // Binding matches rebind $global; keep the use site for loop-scope checks.
+  $global as $reference where {
+    $global <: r"^(?:window|document|localStorage|sessionStorage|navigator|requestAnimationFrame|cancelAnimationFrame)$",
+    $program <: not contains browser_global_binding($global, $reference) until or {
       function_node(),
       JsBlockStatement()
     },
@@ -323,16 +334,14 @@ pattern browser_global() {
       or {
         $params <: contains and { JsIdentifierBinding(),
         $global } until JsInitializerClause(),
-        $scope <: contains and { JsIdentifierBinding(),
-        $global } until or {
+        $scope <: contains browser_global_binding($global, $reference) until or {
           function_node(),
           JsBlockStatement()
         }
       }
     },
     $global <: not within `{ $scope }` where {
-      $scope <: contains and { JsIdentifierBinding(),
-      $global } until or {
+      $scope <: contains browser_global_binding($global, $reference) until or {
         function_node(),
         JsBlockStatement()
       }
@@ -349,6 +358,7 @@ pattern syncs_with_browser() {
     `new IntersectionObserver($_, $_)`,
     `new MutationObserver($_)`,
     `$browser.$_` where { $browser <: browser_global() },
+    `$browser.$_ = $_` where { $browser <: browser_global() },
     `$browser($_)` where { $browser <: r"requestAnimationFrame|cancelAnimationFrame", $browser <: browser_global() },
     `$_.scrollIntoView()`,
     `$_.scrollIntoView($_)`,
