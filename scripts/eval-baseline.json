@@ -4,8 +4,8 @@
   "caught": {
     "recommended": {
       "no-adjust-state-on-prop-change": 7,
-      "no-chain-state-updates": 5,
-      "no-derived-state": 58,
+      "no-chain-state-updates": 4,
+      "no-derived-state": 53,
       "no-event-handler": 8,
       "no-external-store-subscription": 11,
       "no-initialize-state": 12,
@@ -15,8 +15,8 @@
     },
     "deep": {
       "no-adjust-state-on-prop-change": 7,
-      "no-chain-state-updates": 5,
-      "no-derived-state": 71,
+      "no-chain-state-updates": 4,
+      "no-derived-state": 65,
       "no-event-handler": 8,
       "no-external-store-subscription": 11,
       "no-initialize-state": 12,

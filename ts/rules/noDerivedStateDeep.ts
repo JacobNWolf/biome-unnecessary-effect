@@ -1,9 +1,11 @@
 import {
   effectOf,
   hasCleanup,
+  isFunction,
   syncsWithBrowser,
   synchronousCalls,
   upstream,
+  unwrap,
   writtenOutsideEffects,
 } from '../shared/react.ts';
 import { defineRule, registerDiagnostic, semantic } from '@biomejs/runtime/plugin';
@@ -27,7 +29,9 @@ export const noDerivedStateDeep = defineRule({
       if (!call.callee) continue;
       const setter = upstream(model, call.callee, true).find((source) => source.kind === 'setter');
       if (!setter || writtenOutsideEffects(model, setter.binding)) continue;
+      if (isFunction(unwrap(call.arguments?.args[0]))) continue;
       const reads = call.arguments ? upstream(model, call.arguments) : [];
+      if (reads.some((source) => source.kind === 'state' && source.name === setter.state)) continue;
       if (reads.some((source) => source.kind === 'external')) continue;
       if (!reads.some((source) => source.kind === 'state' || source.kind === 'prop')) continue;
 
