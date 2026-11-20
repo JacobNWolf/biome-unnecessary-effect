@@ -38,7 +38,8 @@
     },
     "deep": {
       "no-derived-state": {
-        "From internal state via pure global function": "Upstream stopped tracing state through call arguments (see util/ast.test.js). This state is still derived, so the report is correct."
+        "From internal state via pure global function": "Upstream stopped tracing state through call arguments (see util/ast.test.js). This state is still derived, so the report is correct.",
+        "Set to result of pure local ArrowFunctionExpression": "Ordinary function initializers trace their arguments, unlike hooks that return external data. This state is still derived, so the report is correct."
       },
       "no-pass-data-to-parent": {
         "Renamed useRef import": "Doesn't recognise useRef imported under another name, so it treats the ref as data."
