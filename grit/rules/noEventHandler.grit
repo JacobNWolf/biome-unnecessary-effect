@@ -450,6 +450,19 @@ or {
   $body <: contains $if until function_node(),
   $body <: not contains cleanup_return() until function_node(),
   $if <: within enclosing_function($unused1, $params, $component),
+  $test <: not contains or {
+    `location.$_`,
+    `$search.get($_)` where {
+      $component <: contains `const $binding = useSearchParams()` where {
+        $binding <: or {
+          $search,
+          and { JsArrayBindingPattern(),
+          contains and { JsIdentifierBinding(),
+          $search } }
+        }
+      } until declaration_boundary()
+    }
+  },
   // Setter calls and ref writes alone are state sync, which the state rules report with better advice.
   // An early return guards the rest of the effect body instead of a block.
   or {
@@ -457,6 +470,20 @@ or {
       $if <: or {
         `if ($_) return;`,
         `if ($_) { return; }`
+      },
+      $test <: not or {
+        `!$available` where {
+          $available <: or {
+            binding_name(),
+            `$_.$_`
+          }
+        },
+        `$available == null`,
+        `$available === null`,
+        `$available === undefined`,
+        `null == $available`,
+        `null === $available`,
+        `undefined === $available`
       },
       $body <: contains and { side_effect_call($component),
       not within $if } until function_node()
