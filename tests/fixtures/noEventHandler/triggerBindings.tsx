@@ -30,7 +30,7 @@ export function LocalCallback({ id, onData }: { id: string; onData: (data: unkno
 
 export function GuardedAdjustment({ features, isOpen }: { features: string[]; isOpen: boolean }) {
   const [value, setValue] = useState('');
-  useEffect(() => { // expect: noResetAllStateOnPropChange
+  useEffect(() => {
     if (!isOpen) {
       setValue(''); // expect: noAdjustStateOnPropChange
     }

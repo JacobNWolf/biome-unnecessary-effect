@@ -22,8 +22,10 @@ export function Picker({ items }: { items: string[] }) {
 
 export function AssertedInitial({ id }) {
  const [user, setUser] = useState(null as string | null);
+ const [draft, setDraft] = useState('');
  useEffect(() => { // expect: noResetAllStateOnPropChange
   setUser(null); // expect: noAdjustStateOnPropChange
+  setDraft(''); // expect: noAdjustStateOnPropChange
  }, [id]);
  return user;
 }
@@ -40,25 +42,30 @@ export function AssertedReset({ id }) {
 
 export function EffectAliasReset({ userId }) {
   const [user, setUser] = useState(null);
+  const [draft, setDraft] = useState('');
   useEffect(() => { // expect: noResetAllStateOnPropChange
     const reset = setUser;
     reset(null);
+    setDraft(''); // expect: noAdjustStateOnPropChange
   }, [userId]);
   return user;
 }
 
 export function ComponentAliasReset({ userId }) {
   const [user, setUser] = useState(null);
+  const [draft, setDraft] = useState('');
   const reset = setUser;
   useEffect(() => { // expect: noResetAllStateOnPropChange
     reset(null); // expect: noAdjustStateOnPropChange
+    setDraft(''); // expect: noAdjustStateOnPropChange
   }, [userId]);
   return user;
 }
 
 export function HelperReset({ userId }) {
   const [user, setUser] = useState(null);
-  const resetUser = () => setUser(null);
+  const [draft, setDraft] = useState('');
+  const resetUser = () => { setUser(null); setDraft(''); };
   useEffect(() => { // expect: noResetAllStateOnPropChange
     resetUser();
   }, [userId]);
