@@ -1,4 +1,11 @@
-import { effectOf, hasCleanup, synchronousCalls, upstream, writtenOutsideEffects } from '../shared/react.ts';
+import {
+  effectOf,
+  hasCleanup,
+  syncsWithBrowser,
+  synchronousCalls,
+  upstream,
+  writtenOutsideEffects,
+} from '../shared/react.ts';
 import { defineRule, registerDiagnostic, semantic } from '@biomejs/runtime/plugin';
 
 export const noDerivedStateDeep = defineRule({
@@ -6,13 +13,22 @@ export const noDerivedStateDeep = defineRule({
   run(node, { model }) {
     const effect = effectOf(model, node);
     // Mount-only and dependency-less effects belong to noInitializeState and noSetStateInEffectWithoutDeps.
-    if (!effect || effect.mountOnly || !effect.deps || effect.deps.text === '[]' || hasCleanup(effect.callback)) return;
+    if (
+      !effect ||
+      effect.mountOnly ||
+      !effect.deps ||
+      effect.deps.text === '[]' ||
+      hasCleanup(effect.callback) ||
+      syncsWithBrowser(model, effect.callback)
+    )
+      return;
 
     for (const { call, origin } of synchronousCalls(model, effect.callback)) {
       if (!call.callee) continue;
       const setter = upstream(model, call.callee, true).find((source) => source.kind === 'setter');
       if (!setter || writtenOutsideEffects(model, setter.binding)) continue;
       const reads = call.arguments ? upstream(model, call.arguments) : [];
+      if (reads.some((source) => source.kind === 'external')) continue;
       if (!reads.some((source) => source.kind === 'state' || source.kind === 'prop')) continue;
 
       registerDiagnostic(
