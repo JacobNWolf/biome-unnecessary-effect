@@ -206,14 +206,22 @@ pattern prop_expression($params) {
   or {
     `$object.$_`,
     $object
-  } where { $object <: binding_name(), $params <: contains $object }
+  } where {
+    $object <: binding_name(),
+    $params <: contains and { JsIdentifierBinding(),
+    $object } until JsInitializerClause()
+  }
 }
 
 pattern prop_or_context($scope, $params, $ref) {
   $ref where {
     $ref <: binding_name(),
     or {
-      $params <: contains $ref,
+      $params <: contains and { JsIdentifierBinding(),
+      $ref } until JsInitializerClause(),
+      $scope <: contains `const [$ref] = [$value]` where {
+        $value <: prop_expression($params)
+      } until declaration_boundary(),
       $scope <: contains `const $binding = $value` where {
         $binding <: or {
           $ref,
@@ -228,7 +236,8 @@ pattern prop_or_context($scope, $params, $ref) {
           `useContext($_)`,
           `React.useContext($_)`,
           prop_expression($params),
-          contains `$prop($_)` where { $prop <: prop_expression($params) }
+          and { function_node(),
+          contains `$prop($_)` where { $prop <: prop_expression($params) } }
         }
       } until declaration_boundary()
     }
@@ -254,7 +263,8 @@ pattern prop_reference($scope, $local, $params, $ref) {
   $ref where {
     $ref <: binding_name(),
     or {
-      $params <: contains $ref,
+      $params <: contains and { JsIdentifierBinding(),
+      $ref } until JsInitializerClause(),
       $scope <: contains `const $binding = $context` where {
         $context <: or {
           `useContext($_)`,
@@ -299,7 +309,11 @@ pattern prop_reference($scope, $local, $params, $ref) {
             }
           } until declaration_boundary()
         },
-        $value <: contains $source where { $source <: binding_name(), $params <: contains $source }
+        $value <: contains $source where {
+          $source <: binding_name(),
+          $params <: contains and { JsIdentifierBinding(),
+          $source } until JsInitializerClause()
+        }
       }
     }
   }
@@ -421,7 +435,22 @@ pattern enclosing_function($name, $params, $body) {
   $body <: contains $call until function_node(),
   $call <: within enclosing_function($unused1, $params, $component),
   $setter <: state_setter($component, $state, $setter, $original),
-  $deps <: contains prop_reference($component, $body, $params, $prop),
+  $deps <: contains prop_or_context($component, $params, $dependencyProp),
+  or {
+    $arg <: contains prop_or_context($component, $params, $prop),
+    and {
+      $arg <: not contains prop_or_context($component, $params, $unusedArgProp),
+      $call <: within `if ($test) { $_ }`,
+      $test <: contains prop_or_context($component, $params, $prop)
+    },
+    and {
+      $arg <: not contains prop_or_context($component, $params, $unusedArgProp),
+      $call <: not within `if ($guard) { $_ }` where {
+        $guard <: contains prop_or_context($component, $params, $unusedGuardProp)
+      },
+      $deps <: contains prop_or_context($component, $params, $prop)
+    }
+  },
   or {
     $arg <: not contains prop_reference($component, $body, $params, $unused2),
     $component <: written_outside_effects($setter, $original),

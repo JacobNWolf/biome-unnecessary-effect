@@ -52,7 +52,7 @@ export function MemoizedWrapper({ onFetched }: { onFetched: (v: string) => void 
   const [data] = useState('');
   const wrapped = useCallback((v: string) => onFetched(v), [onFetched]);
   useEffect(() => {
-    wrapped(data); // expect: noPassLiveStateToParent
+    wrapped(data);
   }, [data, wrapped]);
 }
 
