@@ -36,7 +36,7 @@ export function SaveAndTrack() {
   const [toast, setToast] = useState('');
   useEffect(() => {
     if (saved) { // expect: noEventHandler
-      setToast('Saved'); // expect: noChainStateUpdates
+      setToast('Saved');
       showNotification('Saved');
     }
   }, [saved]);

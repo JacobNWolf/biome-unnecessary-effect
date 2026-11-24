@@ -157,7 +157,7 @@ pattern binding_name() {
 }
 
 // Tracing follows one hop through component/effect locals, excluding other nested functions.
-pattern reads_state($scope, $local) {
+pattern reads_state($scope, $local, $source) {
   $value where {
     $scope <: contains or {
       `const [$source, $_] = $init`,
@@ -169,7 +169,8 @@ pattern reads_state($scope, $local) {
       or {
         $value <: or {
           $source,
-          contains $source
+          contains and { JsReferenceIdentifier(),
+          $source }
         },
         $local <: contains or {
           `const $alias = $aliasValue`,
@@ -178,9 +179,11 @@ pattern reads_state($scope, $local) {
           $alias <: binding_name(),
           $value <: or {
             $alias,
-            contains $alias
+            contains and { JsReferenceIdentifier(),
+            $alias }
           },
-          $aliasValue <: contains $source
+          $aliasValue <: contains and { JsReferenceIdentifier(),
+          $source }
         } until declaration_boundary(),
         $scope <: contains or {
           `const $alias = $aliasValue`,
@@ -189,9 +192,11 @@ pattern reads_state($scope, $local) {
           $alias <: binding_name(),
           $value <: or {
             $alias,
-            contains $alias
+            contains and { JsReferenceIdentifier(),
+            $alias }
           },
-          $aliasValue <: contains $source
+          $aliasValue <: contains and { JsReferenceIdentifier(),
+          $source }
         } until declaration_boundary()
       }
     } until declaration_boundary()
@@ -403,6 +408,14 @@ pattern reads_dom() {
   }
 }
 
+// Calls inside setter arguments compute the next value rather than synchronize an external system.
+pattern side_effect_call($component) {
+  JsCallExpression() as $call where {
+    $call <: not within `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) },
+    $call <: not `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) }
+  }
+}
+
 pattern enclosing_function($name, $params, $body) {
   and { or {
     JsFunctionDeclaration(),
@@ -436,7 +449,12 @@ pattern enclosing_function($name, $params, $body) {
   $body <: not contains cleanup_return() until function_node(),
   $call <: within enclosing_function($unused1, $params, $component),
   $setter <: state_setter($component, $state, $setter),
-  $deps <: contains state_reference($component, $body, $dep) until JsCallExpression(),
+  $deps <: contains and { JsReferenceIdentifier(),
+  binding_name() } as $dep where {
+    $dep <: reads_state($component, $body, $source),
+    $source <: not $state
+  } until JsCallExpression(),
+  $body <: not contains side_effect_call($component) until function_node(),
   $arg <: not contains state_reference($component, $body, $unused2),
   // A prop in the deps makes this noAdjustStateOnPropChange or noDerivedState, which give better advice.
   $deps <: not contains prop_reference($component, $body, $params, $unused3),

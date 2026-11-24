@@ -34,7 +34,7 @@ export type Source =
   | { kind: 'prop'; name: string }
   | { kind: 'external' };
 
-const isFunction = (node: AnyJsAstNode | undefined) =>
+export const isFunction = (node: AnyJsAstNode | undefined) =>
   node?.kind === 'JS_ARROW_FUNCTION_EXPRESSION' ||
   node?.kind === 'JS_FUNCTION_EXPRESSION' ||
   node?.kind === 'JS_FUNCTION_DECLARATION' ||
@@ -58,7 +58,7 @@ const WRAPPERS = [
   'TS_SATISFIES_EXPRESSION',
 ];
 
-const unwrap = (node: AnyJsAstNode | undefined): AnyJsAstNode | undefined => {
+export const unwrap = (node: AnyJsAstNode | undefined): AnyJsAstNode | undefined => {
   let current = node;
   while (current && WRAPPERS.includes(current.kind)) {
     current = current.children()[0];
@@ -127,7 +127,7 @@ const initializerOf = (binding: Binding) => {
   return { declarator, init: unwrap(declarator.initializer?.expression) };
 };
 
-const functionOf = (binding: Binding): AnyJsAstNode | undefined => {
+export const functionOf = (binding: Binding): AnyJsAstNode | undefined => {
   const parent = binding.syntax().parent;
   if (parent?.kind === 'JS_FUNCTION_DECLARATION') return parent;
   const init = initializerOf(binding)?.init;

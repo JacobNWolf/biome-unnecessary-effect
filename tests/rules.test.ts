@@ -87,6 +87,12 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         const adjustment = diagnostics.find(({ location }) => location.path.endsWith('triggerBindings.tsx'));
         expect(adjustment?.message).toContain('when "isOpen" changes');
       }
+      if (rule.name === 'noChainStateUpdates') {
+        const chain = diagnostics.find(
+          ({ location }) => location.path.endsWith('selfDependent.tsx') && location.start.line === 33,
+        );
+        expect(chain?.message).toContain('changes "other"');
+      }
     });
   }
 });
