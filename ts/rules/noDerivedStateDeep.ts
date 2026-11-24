@@ -1,5 +1,6 @@
 import {
   effectOf,
+  functionOf,
   hasCleanup,
   isFunction,
   syncsWithBrowser,
@@ -29,7 +30,10 @@ export const noDerivedStateDeep = defineRule({
       if (!call.callee) continue;
       const setter = upstream(model, call.callee, true).find((source) => source.kind === 'setter');
       if (!setter || writtenOutsideEffects(model, setter.binding)) continue;
-      if (isFunction(unwrap(call.arguments?.args[0]))) continue;
+      const argument = unwrap(call.arguments?.args[0]);
+      const updater =
+        argument?.kind === 'JS_IDENTIFIER_EXPRESSION' && argument.name ? model.binding(argument.name) : undefined;
+      if (isFunction(argument) || (updater && isFunction(functionOf(updater)))) continue;
       const reads = call.arguments ? upstream(model, call.arguments) : [];
       if (reads.some((source) => source.kind === 'state' && source.name === setter.state)) continue;
       if (reads.some((source) => source.kind === 'external')) continue;

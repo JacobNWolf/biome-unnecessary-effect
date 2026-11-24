@@ -46,3 +46,29 @@ export function ExternalWork() {
   }, [ready]);
   return value;
 }
+
+export function AliasSelfReset() {
+  const [flag, setFlag] = useState(true);
+  const active = flag;
+  useEffect(() => {
+    if (active) setFlag(false);
+  }, [active]);
+  return flag;
+}
+
+export function NamedUpdater({ count }: { count: number }) {
+  const [total, setTotal] = useState(0);
+  const increment = (previous: number) => previous + count;
+  useEffect(() => {
+    setTotal(increment);
+  }, [count]);
+  return total;
+}
+
+export function ObjectWithCallback({ count }: { count: number }) {
+  const [state, setState] = useState<{ value: number; onClick: () => void }>({ value: 0, onClick: () => {} });
+  useEffect(() => {
+    setState({ value: count, onClick: () => {} }); // expect: noDerivedState, noDerivedStateDeep
+  }, [count]);
+  return state;
+}

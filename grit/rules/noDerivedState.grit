@@ -437,6 +437,13 @@ pattern enclosing_function($name, $params, $body) {
 }
 // prelude:end
 
+pattern function_value() {
+  or {
+    function_node(),
+    `($fn)` where { $fn <: function_node() }
+  }
+}
+
 `$setter($arg)` as $call where {
   $setter <: binding_name(),
   or {
@@ -450,7 +457,25 @@ pattern enclosing_function($name, $params, $body) {
   $body <: not contains cleanup_return() until function_node(),
   $call <: within enclosing_function($unused1, $params, $component),
   $setter <: state_setter($component, $state, $setter, $original),
-  $arg <: not contains function_node() until JsCallExpression(),
+  $arg <: not contains function_node() until or {
+    JsCallExpression(),
+    JsNewExpression(),
+    JsObjectExpression(),
+    JsArrayExpression()
+  },
+  $arg <: not and { binding_name(),
+  $updater where {
+    or {
+      $body <: contains or {
+        `const $updater = $fn` where { $fn <: function_value() },
+        `function $updater($_) { $_ }`
+      } until declaration_boundary(),
+      $component <: contains or {
+        `const $updater = $fn` where { $fn <: function_value() },
+        `function $updater($_) { $_ }`
+      } until declaration_boundary()
+    }
+  } },
   $arg <: not reads_state($component, $body, $state),
   $component <: not written_outside_effects($setter, $original),
   or {

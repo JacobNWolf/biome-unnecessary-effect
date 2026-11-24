@@ -127,7 +127,7 @@ const initializerOf = (binding: Binding) => {
   return { declarator, init: unwrap(declarator.initializer?.expression) };
 };
 
-const functionOf = (binding: Binding): AnyJsAstNode | undefined => {
+export const functionOf = (binding: Binding): AnyJsAstNode | undefined => {
   const parent = binding.syntax().parent;
   if (parent?.kind === 'JS_FUNCTION_DECLARATION') return parent;
   const init = initializerOf(binding)?.init;
