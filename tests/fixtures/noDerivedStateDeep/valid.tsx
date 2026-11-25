@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 
 declare function load(query: string): Promise<string>;
 
@@ -52,3 +52,31 @@ export const Errors = ({ url }: { url: string }) => {
   }, [url]);
   return String(err) + x;
 };
+
+export function AsyncEffectEventWrites({ value }: { value: string }) {
+  const [draft, setDraft] = useState('');
+  const [cached, setCached] = useState('');
+
+  const refreshAsync = useEffectEvent(async () => {
+    const remote = await load(value);
+    setDraft(remote);
+  });
+
+  const refreshThen = useEffectEvent(() => {
+    load(value).then((remote) => {
+      setCached(remote);
+    });
+  });
+
+  useEffect(() => {
+    refreshAsync();
+    refreshThen();
+  }, []);
+
+  useEffect(() => {
+    setDraft(value);
+    setCached(value);
+  }, [value]);
+
+  return draft + cached;
+}

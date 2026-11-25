@@ -166,7 +166,8 @@ const classify = (model: SemanticModel, binding: Binding): Source | undefined =>
     if (index === 1) return { kind: 'setter', state, binding };
   }
 
-  if (hook === 'useContext') return { kind: 'prop', name: node.text };
+  if (hook === 'useContext' || (hook && /^use[A-Z][A-Za-z0-9_]*Context$/.test(hook)))
+    return { kind: 'prop', name: node.text };
 
   const ancestors = node.ancestors();
   const fnIndex = ancestors.findIndex(isFunction);
@@ -298,6 +299,12 @@ const usedOnlyInEffects = (model: SemanticModel, binding: Binding, seen = new Se
     }
     for (const ancestor of reference.syntax().ancestors()) {
       if (isFunction(ancestor)) functions.push(ancestor);
+      if (ancestor.kind === 'JS_CALL_EXPRESSION' && reactHook(model, ancestor.callee) === 'useEffectEvent') {
+        const first = unwrap(ancestor.arguments?.args[0]);
+        const local = first?.kind === 'JS_IDENTIFIER_EXPRESSION' && first.name ? model.binding(first.name) : undefined;
+        const callback = local ? functionOf(local) : first;
+        return !!callback && !isAsync(callback) && functions.every((fn) => nodeKey(fn) === nodeKey(callback));
+      }
       if (isEffectCall(model, ancestor) && ancestor.kind === 'JS_CALL_EXPRESSION') {
         const first = unwrap(ancestor.arguments?.args[0]);
         const local = first?.kind === 'JS_IDENTIFIER_EXPRESSION' && first.name ? model.binding(first.name) : undefined;
@@ -402,7 +409,9 @@ export const syncsWithBrowser = (model: SemanticModel, fn: AnyJsAstNode): boolea
       const callee = unwrap(node.callee);
       if (
         callee?.kind === 'JS_STATIC_MEMBER_EXPRESSION' &&
-        ['scrollIntoView', 'scrollTo', 'focus'].includes(callee.member?.text ?? '')
+        ['scrollIntoView', 'scrollTo', 'scrollToIndex', 'scrollToOffset', 'scrollBy', 'focus'].includes(
+          callee.member?.text ?? '',
+        )
       )
         return true;
       const binding =

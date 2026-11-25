@@ -149,7 +149,8 @@ pattern written_outside_effects($target, $alias) {
       $hook <: or {
         effect_hook(),
         layout_hook(),
-        mount_hook()
+        mount_hook(),
+        effect_event_hook()
       }
     }
   }
@@ -186,12 +187,20 @@ pattern controller_hook() {
 }
 
 pattern external_hook_call() {
-  or {
+  contains or {
     `$hook($...)`,
     `$hook<$_>($...)`,
     `$hook()`,
     `$hook<$_>()`
-  } where { $hook <: controller_hook() }
+  } where { $hook <: controller_hook() } until or {
+    JsCallArguments(),
+    JsObjectExpression(),
+    JsArrayExpression(),
+    JsBinaryExpression(),
+    JsLogicalExpression(),
+    JsConditionalExpression(),
+    function_node()
+  }
 }
 
 // Tracing follows one hop through component/effect locals, excluding controller hooks and nested functions.
@@ -254,11 +263,27 @@ pattern state_source_reference($scope, $local, $source) {
   $ref where { $ref <: identifier_reference(), $ref <: reads_state($scope, $local, $source) }
 }
 
+pattern state_reference_with_source($scope, $local, $ref, $source) {
+  $ref where { $ref <: identifier_reference(), $ref <: reads_state($scope, $local, $source) }
+}
+
 pattern effect_only_state($scope, $body, $source) {
   $source where {
-    $scope <: contains state_declaration($source, $flagSetter, $unusedFlagInit) where {
-      $body <: contains `$flagSetter($_)`,
-      $scope <: not written_outside_effects($flagSetter, $flagSetter)
+    $scope <: contains state_declaration($source, $flagSetter, $flagInit) where {
+      $scope <: not written_outside_effects($flagSetter, $flagSetter),
+      or {
+        $body <: contains `$flagSetter($_)`,
+        $scope <: contains `const $ee = $eeCall` where {
+          $ee <: binding_name(),
+          $ee <: invoked_in($body),
+          $eeCall <: `$eeHook($eeCb)` where { $eeHook <: effect_event_hook(), $eeCb <: contains `$flagSetter($_)` }
+        } until declaration_boundary(),
+        and {
+          $flagInit <: `false`,
+          $scope <: contains `$flagSetter(true)`,
+          $scope <: not contains `$flagSetter($flagArg)` where { $flagArg <: not `true` }
+        }
+      }
     } until declaration_boundary()
   }
 }
@@ -319,6 +344,29 @@ pattern parent_callback($scope, $params) {
   }
 }
 
+pattern custom_context_reference($scope, $ref) {
+  $ref where {
+    $ref <: identifier_reference(),
+    $scope <: contains `const $binding = $context` where {
+      $context <: or {
+        `$ctxHook($...)`,
+        `$ctxHook<$_>($...)`,
+        `$ctxHook()`,
+        `$ctxHook<$_>()`
+      } where { $ctxHook <: r"^use[A-Z][A-Za-z0-9_]*Context$" },
+      $binding <: or {
+        $ref,
+        and { JsObjectBindingPattern(),
+        contains and { JsIdentifierBinding(),
+        $ref } until or {
+          JsInitializerClause(),
+          JsComputedMemberName()
+        } }
+      }
+    } until declaration_boundary()
+  }
+}
+
 // One-hop tracing follows props only; context values must be referenced directly.
 pattern prop_reference($scope, $local, $params, $ref) {
   $ref where {
@@ -354,6 +402,19 @@ pattern prop_reference($scope, $local, $params, $ref) {
                 use_state_call($unusedLocalInit),
                 JsArrayExpression()
               }
+            },
+            `const $binding = $value` where {
+              $binding <: and { JsObjectBindingPattern(),
+              contains and { JsIdentifierBinding(),
+              $ref } until or {
+                JsInitializerClause(),
+                JsComputedMemberName()
+              } },
+              $value <: not or {
+                use_state_call($unusedLocalObjInit),
+                external_hook_call(),
+                JsObjectExpression()
+              }
             }
           } until declaration_boundary(),
           $scope <: contains or {
@@ -366,6 +427,19 @@ pattern prop_reference($scope, $local, $params, $ref) {
               $value <: not or {
                 use_state_call($unusedScopeInit),
                 JsArrayExpression()
+              }
+            },
+            `const $binding = $value` where {
+              $binding <: and { JsObjectBindingPattern(),
+              contains and { JsIdentifierBinding(),
+              $ref } until or {
+                JsInitializerClause(),
+                JsComputedMemberName()
+              } },
+              $value <: not or {
+                use_state_call($unusedScopeObjInit),
+                external_hook_call(),
+                JsObjectExpression()
               }
             }
           } until declaration_boundary()
@@ -449,6 +523,9 @@ pattern syncs_with_browser() {
     `$_.scrollIntoView($_)`,
     `$_.scrollTo($_)`,
     `$_.scrollTo($_, $_)`,
+    `$_.scrollToIndex($...)`,
+    `$_.scrollToOffset($...)`,
+    `$_.scrollBy($...)`,
     `$_.focus()`,
     `$_.focus($_)`
   }
@@ -491,19 +568,101 @@ pattern async_or_fetch_effect() {
   }
 }
 
+// `.test()` on a `g`/`y` regex advances its shared `lastIndex`; only regexes without those flags or freshly built ones are safe.
+pattern stateless_regex_literal() {
+  and { JsRegexLiteralExpression(),
+  not r"^[\s\S]*/[a-z]*[gy][a-z]*$" }
+}
+
+pattern stateless_regex_const($re) {
+  or {
+    `const $re = $lit`,
+    `const $re: $_ = $lit`
+  } where { $lit <: stateless_regex_literal() }
+}
+
+pattern stateless_regex() {
+  or {
+    stateless_regex_literal(),
+    `new RegExp($...)`,
+    // Binding matches rebind $re; keep the use site for scope and shadowing checks.
+    // Match `$re` before `JsIdentifierBinding()` and skip initializers/expressions/returns so repeated `.test()` calls stay fast.
+    $re as $reUse where {
+      $re <: identifier_reference(),
+      $reUse <: not within function_node() as $fn where {
+        $fn <: contains and { $re,
+        JsIdentifierBinding() } as $shadowBinding where {
+          $shadowBinding <: not within stateless_regex_const($re)
+        } until or {
+          JsInitializerClause(),
+          JsExpressionStatement(),
+          JsReturnStatement()
+        }
+      },
+      or {
+        and {
+          $program <: contains and { $re,
+          JsIdentifierBinding() } as $topReBinding where {
+            $topReBinding <: within stateless_regex_const($re)
+          } until or {
+            function_node(),
+            JsBlockStatement(),
+            JsExpressionStatement()
+          },
+          $program <: not contains and { $re,
+          JsIdentifierBinding() } as $topShadowBinding where {
+            $topShadowBinding <: not within stateless_regex_const($re)
+          } until or {
+            function_node(),
+            JsBlockStatement(),
+            JsExpressionStatement()
+          }
+        },
+        $reUse <: within or {
+          JsFunctionBody(),
+          JsBlockStatement()
+        } as $reScope where {
+          $reScope <: contains and { $re,
+          JsIdentifierBinding() } as $localReBinding where {
+            $localReBinding <: within stateless_regex_const($re),
+            $localReBinding <: not within or {
+              function_node(),
+              JsBlockStatement()
+            } as $innerReScope where { $innerReScope <: not $reScope, $innerReScope <: within $reScope }
+          } until or {
+            function_node(),
+            JsInitializerClause(),
+            JsExpressionStatement(),
+            JsReturnStatement()
+          }
+        }
+      }
+    }
+  }
+}
+
 // Pure read/transform methods and constructors that are not external side effects.
 // Standalone expression statements stay side effects so calls like `router.replace()` or `api.get()` are not skipped.
 // Snippet and regex forms avoid JsCallExpression(callee = ...) and JsStaticMemberExpression(member = ...), which Biome 2.4.5 cannot compile.
 pattern pure_call() {
   or {
     `$_.$method($...)` where {
-      $method <: r"^(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
+      $method <: r"^(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd|toSorted|toReversed|toSpliced|with)$"
+    },
+    `$re.test($...)` where { $re <: stateless_regex() },
+    or {
+      `$callee($...)`,
+      `$callee?.($...)`
+    } where {
+      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd|toSorted|toReversed|toSpliced|with)$"
     },
     or {
       `$callee($...)`,
       `$callee?.($...)`
     } where {
-      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
+      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.test$",
+      $callee <: JsStaticMemberExpression(object=$re),
+      $re <: stateless_regex()
     },
     `$fn($...)` where {
       $fn <: r"^(?:Boolean|String|Number|BigInt|Array|Set|Map|parseInt|parseFloat|isNaN|isFinite|isEqual|encodeURIComponent|decodeURIComponent)$"
@@ -517,6 +676,83 @@ pattern pure_call() {
       $stmt <: or {
         `$pureCall;`,
         `$pureCall`
+      }
+    }
+  }
+}
+
+// Initializers that always allocate a new array; `.get()`/`.find()` and similar can return a stored one.
+pattern fresh_array() {
+  or {
+    JsArrayExpression(),
+    `$_.$method($...)` where {
+      $method <: r"^(?:filter|map|flatMap|slice|concat|split|flat|toSorted|toReversed|toSpliced|with)$"
+    },
+    or {
+      `$callee($...)`,
+      `$callee?.($...)`
+    } where {
+      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.(?:filter|map|flatMap|slice|concat|split|flat|toSorted|toReversed|toSpliced|with)$"
+    },
+    `Array.$method($...)` where { $method <: r"^(?:from|of)$" },
+    `Object.$method($...)` where { $method <: r"^(?:keys|values|entries|getOwnPropertyNames)$" },
+    `Array($...)`,
+    `new Array($...)`
+  }
+}
+
+// `.push()` on a local array initialized inside the same function block (not component- or module-level mutation).
+pattern local_array_push() {
+  `$localArr.push($...)` as $pushCall where {
+    $localArr <: identifier_reference(),
+    $pushCall <: within or {
+      JsFunctionBody(),
+      JsBlockStatement()
+    } as $block where {
+      $pushCall <: direct_in_body($block),
+      $pushCall <: not within or {
+        JsBlockStatement(),
+        JsCatchClause(),
+        JsForInStatement(),
+        JsForOfStatement(),
+        JsForStatement()
+      } as $shadowBlock where {
+        $shadowBlock <: not $block,
+        $shadowBlock <: within $block,
+        $shadowBlock <: contains and { JsIdentifierBinding(),
+        $localArr }
+      },
+      or {
+        $block <: contains or {
+          `const $localArr = $arrInit`,
+          `const $localArr: $_ = $arrInit`
+        } as $constDecl where {
+          $arrInit <: fresh_array(),
+          $constDecl <: not within JsBlockStatement() as $innerConstBlock where {
+            $innerConstBlock <: not $block,
+            $innerConstBlock <: within $block
+          }
+        } until function_node(),
+        and {
+          $block <: contains or {
+            `let $localArr = $arrInit`,
+            `let $localArr: $_ = $arrInit`
+          } as $letDecl where {
+            $arrInit <: fresh_array(),
+            $letDecl <: not within JsBlockStatement() as $innerLetBlock where {
+              $innerLetBlock <: not $block,
+              $innerLetBlock <: within $block
+            }
+          } until function_node(),
+          // Node form also covers `??=`/`||=`/`+=` and destructuring targets (`[a] = ...`, `({ a } = ...)`).
+          $block <: not contains JsAssignmentExpression(left=$lhs) where {
+            $lhs <: or {
+              $localArr,
+              contains and { JsIdentifierAssignment(),
+              $localArr }
+            }
+          }
+        }
       }
     }
   }
@@ -536,15 +772,7 @@ pattern state_only_helper($component) {
       $hBody <: contains `$s($_)` where { $s <: state_setter($component, $uState, $s) },
       $hBody <: not contains JsCallExpression() as $innerCall where {
         $innerCall <: not pure_call(),
-        $innerCall <: not `$localArr.push($...)` where {
-          $localArr <: identifier_reference(),
-          $hBody <: contains or {
-            `const $localArr = $_`,
-            `const $localArr: $_ = $_`,
-            `let $localArr = $_`,
-            `let $localArr: $_ = $_`
-          } until function_node()
-        },
+        $innerCall <: not local_array_push(),
         $innerCall <: not `$s2($_)` where { $s2 <: state_setter($component, $u2, $s2) },
         $innerCall <: not within `$s2($_)` where { $s2 <: state_setter($component, $u2, $s2) }
       }
@@ -555,6 +783,7 @@ pattern state_only_helper($component) {
 pattern side_effect_call($component) {
   JsCallExpression() as $call where {
     $call <: not pure_call(),
+    $call <: not local_array_push(),
     $call <: not `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) },
     $call <: not within `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) },
     $call <: not state_only_helper($component)
@@ -678,7 +907,8 @@ pattern if_else_branches($test, $then, $else) {
   or {
     $arg <: contains or {
       state_reference($component, $body, $unused2),
-      prop_reference($component, $body, $params, $unused3)
+      prop_reference($component, $body, $params, $unused3),
+      custom_context_reference($component, $unusedCtx)
     },
     and {
       $call <: within JsIfStatement(),
@@ -693,7 +923,8 @@ pattern if_else_branches($test, $then, $else) {
         $ifElse <: contains `$setter($_)`,
         $ifTest <: contains or {
           state_reference($component, $body, $unused4),
-          prop_reference($component, $body, $params, $unused5)
+          prop_reference($component, $body, $params, $unused5),
+          custom_context_reference($component, $unusedIfCtx)
         }
       }
     }
