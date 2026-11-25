@@ -87,3 +87,43 @@ export function useLetAliasedCount(store: { read: () => number }) {
   }, []);
   return count;
 }
+
+// Editable local UI state updated from user events is not a read-only external store.
+export function Inspector({ active }: { active: boolean }) {
+  const [selected, setSelected] = useState<Element | null>(null);
+  useEffect(() => {
+    if (!active) {
+      setSelected(null);
+      return;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelected(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [active]);
+  return (
+    <button type="button" onClick={() => setSelected(document.body)}>
+      {selected?.tagName}
+    </button>
+  );
+}
+
+declare const externalStore: { get(): number };
+
+// Component-level setter alias in effect, with original setter called in an event handler.
+export function AliasedEditableState() {
+  const [v, setV] = useState(0);
+  const set = setV;
+  useEffect(() => {
+    const update = () => set(externalStore.get());
+    update();
+    window.addEventListener('focus', update);
+    return () => window.removeEventListener('focus', update);
+  }, []);
+  return (
+    <button type="button" onClick={() => setV(0)}>
+      {v}
+    </button>
+  );
+}

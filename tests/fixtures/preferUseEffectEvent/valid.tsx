@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // The ref escapes the hook, so callers may read it from event handlers.
 export function useStateRef<S>(state: S) {
@@ -16,4 +16,44 @@ export function useSave(data: string, save: (data: string) => void) {
     dataRef.current = data;
   }, [data]);
   return useCallback(() => save(dataRef.current), [save]);
+}
+
+// Literal assignments and mount-only effects are flags, not latest-value mirrors.
+export function useMountFlag(initialValue: string, dep: number) {
+  const hasMountedRef = useRef(false);
+  const initialRef = useRef('');
+  const flagRef = useRef(false);
+  useEffect(() => {
+    hasMountedRef.current = true;
+  }, []);
+  useEffect(() => {
+    initialRef.current = initialValue;
+  }, []);
+  useEffect(() => {
+    flagRef.current = true;
+  }, [dep]);
+  useEffect(() => {
+    if (hasMountedRef.current && initialRef.current && flagRef.current) {
+      console.log('ready');
+    }
+  }, [initialValue, dep]);
+}
+
+declare function saveContent(draft: string): Promise<void>;
+
+// Reading the latest ref after an await cannot be replaced with useEffectEvent.
+export function useAutoSave(draft: string) {
+  const latestDraftRef = useRef(draft);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
+  useEffect(() => {
+    latestDraftRef.current = draft;
+  }, [draft]);
+  useEffect(() => {
+    const id = window.setTimeout(async () => {
+      await saveContent(draft);
+      if (latestDraftRef.current === draft) setUnsavedChanges(false);
+    }, 100);
+    return () => window.clearTimeout(id);
+  }, [draft]);
+  return unsavedChanges;
 }

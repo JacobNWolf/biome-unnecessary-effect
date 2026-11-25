@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent } from 'react';
+import React, { useEffect, useEffectEvent } from 'react';
 
 declare function useTimer(callback: () => void, delay: number): void;
 declare function Child(props: { onEvent: () => void }): null;
@@ -29,5 +29,65 @@ export function Mixed({ onTick }: { onTick: () => void }) {
     return () => clearInterval(id);
   }, []);
   useTimer(tick, 500); // expect: noPassingEffectEvent
+  return null;
+}
+
+declare const agent: { stop(): void };
+
+export function AgentRunWatch({
+  running,
+  onChange,
+}: {
+  running: boolean;
+  onChange: (stop: (() => void) | null) => void;
+}) {
+  const stop = useEffectEvent(() => {
+    agent.stop();
+  });
+  useEffect(() => {
+    onChange(running ? stop : null); // expect: noPassingEffectEvent
+    return () => onChange(null);
+  }, [running, onChange]);
+  return null;
+}
+
+export function PropsObjectCallback(props: { onChange: (stop: () => void) => void }) {
+  const stop = useEffectEvent(() => {
+    agent.stop();
+  });
+  useEffect(() => {
+    props.onChange(stop); // expect: noPassingEffectEvent
+  }, [props.onChange]);
+  return null;
+}
+
+export function AliasedParentCallback({ onChange }: { onChange: (stop: () => void) => void }) {
+  const stop = useEffectEvent(() => {
+    agent.stop();
+  });
+  const notify = onChange;
+  useEffect(() => {
+    notify(stop); // expect: noPassingEffectEvent
+  }, [notify]);
+  return null;
+}
+
+export function OptionalParentCallback({ onChange }: { onChange?: (stop: () => void) => void }) {
+  const stop = useEffectEvent(() => {
+    agent.stop();
+  });
+  useEffect(() => {
+    onChange?.(stop); // expect: noPassingEffectEvent
+  }, [onChange]);
+  return null;
+}
+
+export function LayoutParentCallback({ onChange }: { onChange: (stop: () => void) => void }) {
+  const stop = useEffectEvent(() => {
+    agent.stop();
+  });
+  React.useLayoutEffect(() => {
+    onChange(stop); // expect: noPassingEffectEvent
+  }, [onChange]);
   return null;
 }
