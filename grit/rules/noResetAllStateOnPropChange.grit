@@ -824,21 +824,52 @@ pattern open_prop($component, $params, $openProp) {
   }
 }
 
-pattern open_guard($component, $params, $openProp) {
+pattern open_guard($component, $params, $cb, $deps, $openProp) {
   or {
-    `if ($guard) return;`,
-    `if ($guard) { return; }`,
-    `if ($guard) { $guardThen }` where {
+    or {
+      `if ($guard) return;`,
+      `if ($guard) { return; }`,
+      `if ($guard) { $guardThen }` where {
+        $guardThen <: contains `$guardSetter($_)` where {
+          $guardSetter <: state_setter($component, $unusedGuardState, $guardSetter)
+        } until function_node()
+      },
+      `if ($guard) { $_ } else { $guardElse }` where {
+        $guardElse <: contains `$guardSetter($_)` where {
+          $guardSetter <: state_setter($component, $unusedGuardState, $guardSetter)
+        } until function_node()
+      }
+    } where { $guard <: contains open_prop($component, $params, $openProp) },
+    or {
+      `if ($guard) { $guardThen }`,
+      `if ($guard) { $guardThen } else { $_ }`,
+      `if ($guard) { $guardThen } else if ($_) { $_ }`,
+      `if ($guard) { $guardThen } else if ($_) { $_ } else { $_ }`
+    } as $guardStatement where {
       $guardThen <: contains `$guardSetter($_)` where {
         $guardSetter <: state_setter($component, $unusedGuardState, $guardSetter)
-      } until function_node()
-    },
-    `if ($guard) { $_ } else { $guardElse }` where {
-      $guardElse <: contains `$guardSetter($_)` where {
-        $guardSetter <: state_setter($component, $unusedGuardState, $guardSetter)
-      } until function_node()
+      } until function_node(),
+      $guard <: or {
+        `$openProp && !$ref.current`,
+        `!$ref.current && $openProp`
+      },
+      $ref <: identifier_reference(),
+      $openProp <: or {
+        prop_or_context($component, $params, $openProp),
+        `$propsObj.$openMember` as $openProp where {
+          $propsObj <: prop_or_context($component, $params, $propsObj),
+          $openMember <: not `current`
+        }
+      },
+      // Biome 2.4.5 requires snippets rather than native node fields to capture the statement list.
+      $cb <: or {
+        `() => { $statements }`,
+        `function () { $statements }`
+      },
+      $statements <: [..., $guardStatement, ..., `$ref.current = $openProp;`, ...],
+      $deps <: contains $openProp
     }
-  } where { $guard <: contains open_prop($component, $params, $openProp) }
+  }
 }
 
 `$hook($cb, $deps)` as $effect where {
@@ -881,7 +912,7 @@ pattern open_guard($component, $params, $openProp) {
   },
   or {
     and {
-      $body <: contains open_guard($component, $params, $openProp) until function_node(),
+      $body <: contains open_guard($component, $params, $cb, $deps, $openProp) until function_node(),
       or {
         and {
           $deps <: contains prop_or_context($component, $params, $idProp) where {
@@ -900,7 +931,7 @@ pattern open_guard($component, $params, $openProp) {
       }
     },
     and {
-      $body <: not contains open_guard($component, $params, $unusedOpenProp) until function_node(),
+      $body <: not contains open_guard($component, $params, $cb, $deps, $unusedOpenProp) until function_node(),
       or {
         and {
           $prop <: r"(?:id|key|slug|uuid|[A-Za-z_$][A-Za-z0-9_$]*(?:Id|Key))",

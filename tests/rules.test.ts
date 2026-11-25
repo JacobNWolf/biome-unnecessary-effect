@@ -219,6 +219,24 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         expect(modalAt(127)).not.toContain('when "isOpen" changes');
         expect(modalAt(140)).toContain('key={tabId}');
         expect(modalAt(140)).not.toContain('when "isActive" changes');
+        const risingEdgeAt = (line: number) =>
+          diagnostics.find(
+            ({ location }) => location.path.endsWith('refTrackedOpenTransition.tsx') && location.start.line === line,
+          )?.message;
+        for (const line of [7, 38]) {
+          expect(risingEdgeAt(line)).toContain('when "isFlowActive" changes');
+          expect(risingEdgeAt(line)).toContain('{isFlowActive && <Form />}');
+          expect(risingEdgeAt(line)).not.toContain('key={');
+        }
+        expect(risingEdgeAt(69)).toContain('when "isFlowActive" changes');
+        expect(risingEdgeAt(69)).toContain('key={itemId}');
+        expect(risingEdgeAt(89)).toContain('when "props.isFlowActive" changes');
+        expect(risingEdgeAt(89)).toContain('{props.isFlowActive && <Form />}');
+        for (const line of [111, 125, 139]) {
+          expect(risingEdgeAt(line)).toContain('key={itemId}');
+          expect(risingEdgeAt(line)).not.toContain('when "isFlowActive" changes');
+          expect(risingEdgeAt(line)).not.toContain('<Form />');
+        }
       }
       if (rule.name === 'noEventHandler') {
         const alias = diagnostics.find(
