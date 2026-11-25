@@ -31,3 +31,22 @@ export function Mixed({ onTick }: { onTick: () => void }) {
   useTimer(tick, 500); // expect: noPassingEffectEvent
   return null;
 }
+
+declare const agent: { stop(): void };
+
+export function AgentRunWatch({
+  running,
+  onChange,
+}: {
+  running: boolean;
+  onChange: (stop: (() => void) | null) => void;
+}) {
+  const stop = useEffectEvent(() => {
+    agent.stop();
+  });
+  useEffect(() => {
+    onChange(running ? stop : null); // expect: noPassingEffectEvent
+    return () => onChange(null);
+  }, [running, onChange]);
+  return null;
+}

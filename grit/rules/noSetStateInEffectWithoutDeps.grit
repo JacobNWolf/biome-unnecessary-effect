@@ -533,6 +533,10 @@ pattern enclosing_function($name, $params, $body) {
     JsSwitchStatement(),
     JsTryStatement()
   } as $cond where { $cond <: within $body },
+  $body <: not contains JsIfStatement() as $earlyGuard where {
+    $earlyGuard <: direct_in_body($body),
+    $earlyGuard <: contains JsReturnStatement() until function_node()
+  },
   $call <: within enclosing_function($unused1, $params, $component),
   $setter <: state_setter($component, $state, $setter),
   register_diagnostic(span=$call, message=`Setting "$state" unconditionally in an effect with no dependency array re-renders and re-runs the effect forever. Add a dependency array, or compute the value during render.`, severity="warn")

@@ -519,12 +519,19 @@ pattern enclosing_function($name, $params, $body) {
 // prelude:end
 
 `$ref.current = $value` as $assignment where {
+  $value <: not or {
+    JsBooleanLiteralExpression(),
+    JsNumberLiteralExpression(),
+    JsStringLiteralExpression(),
+    JsNullLiteralExpression(),
+    `undefined`
+  },
   $program <: contains or {
     `const $ref = useRef($_)`,
     `const $ref = React.useRef($_)`
   },
   $assignment <: within or {
-    `$hook($cb, $deps)`,
+    `$hook($cb, $deps)` where { $deps <: not `[]` },
     `$hook($cb)`
   } where {
     $hook <: or {
@@ -545,18 +552,23 @@ pattern enclosing_function($name, $params, $body) {
       `const $ref = useRef($_)`,
       `const $ref = React.useRef($_)`
     },
-    $use <: not within `$readHook($_, $_)` where {
-      $readHook <: or {
-        effect_hook(),
-        layout_hook()
-      }
-    },
-    $use <: not within `$readHook($_)` where {
-      $readHook <: or {
-        effect_hook(),
-        layout_hook(),
-        mount_hook()
-      }
+    or {
+      and {
+        $use <: not within `$readHook($_, $_)` where {
+          $readHook <: or {
+            effect_hook(),
+            layout_hook()
+          }
+        },
+        $use <: not within `$readHook($_)` where {
+          $readHook <: or {
+            effect_hook(),
+            layout_hook(),
+            mount_hook()
+          }
+        }
+      },
+      $use <: within function_node() as $asyncFn where { $asyncFn <: r"^async\b[\s\S]*" }
     }
   },
   register_diagnostic(span=$assignment, message=`This effect only copies "$value" into "$ref" so other code can read the latest value. On React 19.2+, read "$value" inside a useEffectEvent function instead. See https://react.dev/reference/react/useEffectEvent`, severity="info")

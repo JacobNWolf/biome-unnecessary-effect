@@ -87,3 +87,24 @@ export function useLetAliasedCount(store: { read: () => number }) {
   }, []);
   return count;
 }
+
+// Editable local UI state updated from user events is not a read-only external store.
+export function Inspector({ active }: { active: boolean }) {
+  const [selected, setSelected] = useState<Element | null>(null);
+  useEffect(() => {
+    if (!active) {
+      setSelected(null);
+      return;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelected(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [active]);
+  return (
+    <button type="button" onClick={() => setSelected(document.body)}>
+      {selected?.tagName}
+    </button>
+  );
+}

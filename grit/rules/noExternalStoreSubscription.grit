@@ -530,7 +530,9 @@ pattern enclosing_function($name, $params, $body) {
         `const $handler = ($_) => $handlerBody`,
         `const $handler = function ($_) { $handlerBody }`
       } where {
-        $handlerBody <: contains `$setter($_)` where { $setter <: state_setter($component, $state, $setter) },
+        $handlerBody <: contains `$setter($_)` where {
+          $setter <: state_setter($component, $state, $setter, $original)
+        },
         $cleanup <: contains $handler
       },
       $body <: contains or {
@@ -548,7 +550,7 @@ pattern enclosing_function($name, $params, $body) {
         `$_.listen($_)`,
         `const $unsubscribe = $subscribe($args)` where { $args <: r"[\s\S]+", $cleanup <: contains `$unsubscribe()` }
       } until function_node(),
-      $cleanup <: contains `$setter($_)` where { $setter <: state_setter($component, $state, $setter) },
+      $cleanup <: contains `$setter($_)` where { $setter <: state_setter($component, $state, $setter, $original) },
       $body <: contains or {
         `$setter($_)`,
         `$wrapper($_)` where {
@@ -566,5 +568,10 @@ pattern enclosing_function($name, $params, $body) {
   $body <: not reads_dom(),
   // An effect that re-subscribes when its own state changes is a state machine, not a store read.
   $deps <: not contains $state,
+  $component <: not written_outside_effects($setter, $original),
+  or {
+    $original <: $setter,
+    and { $original <: not $setter, $component <: not written_outside_effects($original, $setter) }
+  },
   register_diagnostic(span=$sync, message=`Avoid subscribing to an external store in an effect. Read "$state" with useSyncExternalStore instead. See https://react.dev/learn/you-might-not-need-an-effect#subscribing-to-an-external-store`, severity="warn")
 }
