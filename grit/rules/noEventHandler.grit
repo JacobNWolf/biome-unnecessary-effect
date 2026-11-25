@@ -587,7 +587,6 @@ pattern event_guard($body, $component, $params, $deps, $test, $message) {
     `if ($test) return;`,
     `if ($test) $then` where { $then <: not JsBlockStatement(), $then <: not `return;` }
   } as $if where {
-    $if <: direct_in_body($body),
     $if <: not contains JsElseClause() until JsBlockStatement(),
     $test <: not contains or {
       `location.$_`,
@@ -669,24 +668,28 @@ or {
   `useCustomCompareEffect($cb, $deps, $comparator)`
 } as $effect where {
   $cb <: sync_callback($body),
+  $body <: contains JsIfStatement() until function_node(),
   $body <: not syncs_with_browser(),
   $body <: not contains cleanup_return() until function_node(),
   $effect <: within enclosing_function($unused1, $params, $component),
   $body <: contains side_effect_call($component) until function_node(),
   // Prefer a non-early-return if over an early-return bail-out guard; report at most once per effect.
   or {
-    $body <: contains and { not or {
+    $body <: contains and { JsIfStatement(),
+    not or {
       `if ($_) return;`,
       `if ($_) { return; }`
     },
     event_guard($body, $component, $params, $deps, $test, $message) } until function_node(),
     and {
-      $body <: contains and { or {
+      $body <: contains and { JsIfStatement(),
+      or {
         `if ($_) return;`,
         `if ($_) { return; }`
       },
       event_guard($body, $component, $params, $deps, $test, $message) } until function_node(),
-      $body <: not contains and { not or {
+      $body <: not contains and { JsIfStatement(),
+      not or {
         `if ($_) return;`,
         `if ($_) { return; }`
       },
