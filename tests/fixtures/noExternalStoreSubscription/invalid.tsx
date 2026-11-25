@@ -17,11 +17,12 @@ export function useOnlineStatus() {
   return isOnline;
 }
 
-export function useCount(store: { read: () => number }) {
+export function useCount(store: { read: () => number; subscribe: (callback: (value: number) => void) => () => void }) {
   const [count, setCount] = useState(0);
   useEffect(() => {
     setCount(store.read()); // expect: noExternalStoreSubscription
-    return () => setCount(0);
+    const unsubscribe = store.subscribe(setCount);
+    return () => { unsubscribe(); setCount(0); };
   }, []);
   return count;
 }
@@ -44,12 +45,25 @@ export function useAnchors() {
   return anchors;
 }
 
-export function useAliasedCount(store: { read: () => number }) {
+export function useAliasedCount(store: { read: () => number; subscribe: (callback: (value: number) => void) => () => void }) {
   const [count, setCount] = useState(0);
   useEffect(() => {
     const update = setCount;
     update(store.read()); // expect: noExternalStoreSubscription
-    return () => setCount(0);
+    const unsubscribe = store.subscribe(setCount);
+    return () => { unsubscribe(); setCount(0); };
+  }, []);
+  return count;
+}
+
+declare function watchChanges(callback: (value: number) => void): () => void;
+
+export function useCustomSubscription() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    setCount(1); // expect: noExternalStoreSubscription
+    const stop = watchChanges(setCount);
+    return () => { stop(); setCount(0); };
   }, []);
   return count;
 }

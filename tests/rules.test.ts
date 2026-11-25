@@ -132,6 +132,17 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         expect(generic?.message).not.toContain('key={data}');
         expect(diagnostics.some(({ message }) => message.includes('key={userId}'))).toBe(true);
       }
+      if (rule.name === 'noInitializeState') {
+        const hydration = diagnostics.find(
+          ({ location }) => location.path.endsWith('hydration.tsx') && location.start.line === 6,
+        );
+        expect(hydration?.message).toContain('useSyncExternalStore');
+        expect(hydration?.message).not.toContain('Pass this value');
+        const ordinary = diagnostics.find(
+          ({ location }) => location.path.endsWith('hydration.tsx') && location.start.line === 14,
+        );
+        expect(ordinary?.message).toContain('Pass this value');
+      }
     });
   }
 });

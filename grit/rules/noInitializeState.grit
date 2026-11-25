@@ -448,12 +448,30 @@ pattern enclosing_function($name, $params, $body) {
   // An initial read next to a subscription is part of syncing with it.
   $body <: not contains cleanup_return() until function_node(),
   $call <: within enclosing_function($unused1, $params, $component),
-  $setter <: state_setter($component, $state, $setter),
+  $setter <: state_setter($component, $state, $setter, $original),
   // Setters are stable, so an effect whose only dependency is a setter runs once, like `[]`.
   or {
     $hook <: mount_hook(),
     $deps <: `[]`,
     and { $deps <: `[$only]`, $only <: state_setter($component, $unused2, $only) }
   },
-  register_diagnostic(span=$call, message=`Avoid initializing state in an effect. Pass this value to the useState() that declares "$state" instead; for SSR hydration, prefer useSyncExternalStore. See https://tkdodo.eu/blog/avoiding-hydration-mismatches-with-use-sync-external-store`, severity="warn")
+  or {
+    and {
+      $arg <: `true`,
+      $component <: contains state_declaration($state, $original, $initial) where {
+        $initial <: `false`
+      } until declaration_boundary(),
+      $message = `Avoid detecting hydration with a state update in an effect. Read "$state" with useSyncExternalStore or a shared useIsClient hook instead. See https://tkdodo.eu/blog/avoiding-hydration-mismatches-with-use-sync-external-store`
+    },
+    and {
+      not and {
+        $arg <: `true`,
+        $component <: contains state_declaration($state, $original, $otherInitial) where {
+          $otherInitial <: `false`
+        } until declaration_boundary()
+      },
+      $message = `Avoid initializing state in an effect. Pass this value to the useState() that declares "$state" instead; for SSR hydration, prefer useSyncExternalStore. See https://tkdodo.eu/blog/avoiding-hydration-mismatches-with-use-sync-external-store`
+    }
+  },
+  register_diagnostic(span=$call, message=$message, severity="warn")
 }
