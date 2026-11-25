@@ -518,16 +518,33 @@ pattern enclosing_function($name, $params, $body) {
 }
 // prelude:end
 
+pattern open_prop($component, $params, $openProp) {
+  or {
+    prop_or_context($component, $params, $openProp) where {
+      $openProp <: r"^(?:open|opened|visible|show|is(?:[A-Z][A-Za-z0-9]*)?(?:Open|Opened|Visible|Shown))$"
+    },
+    `$propsObj.$openMember` as $openProp where {
+      $propsObj <: prop_or_context($component, $params, $propsObj),
+      $openMember <: r"^(?:open|opened|visible|show|is(?:[A-Z][A-Za-z0-9]*)?(?:Open|Opened|Visible|Shown))$"
+    }
+  }
+}
+
 pattern open_guard($component, $params, $openProp) {
   or {
     `if ($guard) return;`,
     `if ($guard) { return; }`,
-    `if ($guard) { $_ }`
-  } where {
-    $guard <: contains prop_or_context($component, $params, $openProp) where {
-      $openProp <: r"^(?:open|isOpen|visible|isVisible|show|isShown|isActive|isFlowActive)$"
+    `if ($guard) { $guardThen }` where {
+      $guardThen <: contains `$guardSetter($_)` where {
+        $guardSetter <: state_setter($component, $unusedGuardState, $guardSetter)
+      } until function_node()
+    },
+    `if ($guard) { $_ } else { $guardElse }` where {
+      $guardElse <: contains `$guardSetter($_)` where {
+        $guardSetter <: state_setter($component, $unusedGuardState, $guardSetter)
+      } until function_node()
     }
-  }
+  } where { $guard <: contains open_prop($component, $params, $openProp) }
 }
 
 `$hook($cb, $deps)` as $effect where {
@@ -571,7 +588,22 @@ pattern open_guard($component, $params, $openProp) {
   or {
     and {
       $body <: contains open_guard($component, $params, $openProp) until function_node(),
-      $message = `Avoid resetting all state in an effect when "$openProp" changes. Render the stateful form only while "$openProp" is true (for example, {$openProp && <Form />}), or reset the state in the event handler that opens it. If a transition wrapper must stay mounted to animate closing, move the form state into an inner component. See https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes`
+      or {
+        and {
+          $deps <: contains prop_or_context($component, $params, $idProp) where {
+            $idProp <: r"(?:id|key|slug|uuid|[A-Za-z_$][A-Za-z0-9_$]*(?:Id|Key))",
+            $idProp <: not $openProp
+          },
+          $message = `Avoid resetting all state in an effect when "$openProp" changes. Render the stateful form only while "$openProp" is true (for example, {$openProp && <Form />}), or reset the state in the event handler that opens it. If "$idProp" identifies the item, also pass key={$idProp} so React resets its state when "$idProp" changes while open. If a transition wrapper must stay mounted to animate closing, move the form state into an inner component. See https://react.dev/learn/preserving-and-resetting-state`
+        },
+        and {
+          $deps <: not contains prop_or_context($component, $params, $unusedIdProp) where {
+            $unusedIdProp <: r"(?:id|key|slug|uuid|[A-Za-z_$][A-Za-z0-9_$]*(?:Id|Key))",
+            $unusedIdProp <: not $openProp
+          },
+          $message = `Avoid resetting all state in an effect when "$openProp" changes. Render the stateful form only while "$openProp" is true (for example, {$openProp && <Form />}), or reset the state in the event handler that opens it. If a transition wrapper must stay mounted to animate closing, move the form state into an inner component. See https://react.dev/learn/preserving-and-resetting-state`
+        }
+      }
     },
     and {
       $body <: not contains open_guard($component, $params, $unusedOpenProp) until function_node(),

@@ -39,15 +39,109 @@ export function EarlyReturnModal({ open, itemId }: { open: boolean; itemId: stri
   return `${title}${body}`;
 }
 
-export function BracedReturnModal({ isFlowActive, userId }: { isFlowActive: boolean; userId: string }) {
+export function BracedReturnModal({ isModalOpen, userId }: { isModalOpen: boolean; userId: string }) {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState('');
   useEffect(() => { // expect: noResetAllStateOnPropChange
-    if (!isFlowActive) {
+    if (!isModalOpen) {
       return;
     }
     setStep(0); // expect: noAdjustStateOnPropChange
     setDraft(''); // expect: noAdjustStateOnPropChange
-  }, [isFlowActive, userId]);
+  }, [isModalOpen, userId]);
   return `${step}${draft}`;
+}
+
+export function PropsObjectModal(props: { isOpen: boolean; itemId: string }) {
+  const [a, setA] = useState('');
+  const [b, setB] = useState('');
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    if (!props.isOpen) return;
+    setA(''); // expect: noAdjustStateOnPropChange
+    setB(''); // expect: noAdjustStateOnPropChange
+  }, [props.isOpen, props.itemId]);
+  return `${a}${b}`;
+}
+
+export function ElseCloseResetModal({ visible, data }: { visible: boolean; data: object }) {
+  const [a, setA] = useState('');
+  const [b, setB] = useState('');
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    if (visible) {
+      console.debug('open');
+    } else {
+      setA(''); // expect: noAdjustStateOnPropChange
+      setB(''); // expect: noAdjustStateOnPropChange
+    }
+  }, [visible, data]);
+  return `${a}${b}`;
+}
+
+export function VisibleModal({ isVisible, data }: { isVisible: boolean; data: object }) {
+  const [a, setA] = useState('');
+  const [b, setB] = useState('');
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    if (!isVisible) return;
+    setA(''); // expect: noAdjustStateOnPropChange
+    setB(''); // expect: noAdjustStateOnPropChange
+  }, [isVisible, data]);
+  return `${a}${b}`;
+}
+
+export function ShowModal({ show, data }: { show: boolean; data: object }) {
+  const [a, setA] = useState('');
+  const [b, setB] = useState('');
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    if (!show) return;
+    setA(''); // expect: noAdjustStateOnPropChange
+    setB(''); // expect: noAdjustStateOnPropChange
+  }, [show, data]);
+  return `${a}${b}`;
+}
+
+export function ShownModal({ isShown, data }: { isShown: boolean; data: object }) {
+  const [a, setA] = useState('');
+  const [b, setB] = useState('');
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    if (!isShown) return;
+    setA(''); // expect: noAdjustStateOnPropChange
+    setB(''); // expect: noAdjustStateOnPropChange
+  }, [isShown, data]);
+  return `${a}${b}`;
+}
+
+export function OpenedModal({ opened, data }: { opened: boolean; data: object }) {
+  const [a, setA] = useState('');
+  const [b, setB] = useState('');
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    if (!opened) return;
+    setA(''); // expect: noAdjustStateOnPropChange
+    setB(''); // expect: noAdjustStateOnPropChange
+  }, [opened, data]);
+  return `${a}${b}`;
+}
+
+export function UnrelatedGuard({ isOpen, userId }: { isOpen: boolean; userId: string }) {
+  const [a, setA] = useState('');
+  const [b, setB] = useState('');
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    if (isOpen) { // expect: noEventHandler
+      console.debug('x');
+    }
+    setA(''); // expect: noAdjustStateOnPropChange
+    setB(''); // expect: noAdjustStateOnPropChange
+  }, [isOpen, userId]);
+  return `${a}${b}`;
+}
+
+export function TabPanel({ isActive, tabId }: { isActive: boolean; tabId: string }) {
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(0);
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    if (isActive) {
+      setQuery(''); // expect: noAdjustStateOnPropChange
+      setPage(0); // expect: noAdjustStateOnPropChange
+    }
+  }, [isActive, tabId]);
+  return `${query}${page}`;
 }
