@@ -210,7 +210,7 @@ function Form({ first, last }) {
 
 Compute the value during render: `` const fullName = `${first} ${last}` ``. [Learn more](https://react.dev/learn/you-might-not-need-an-effect#updating-state-based-on-props-or-state)
 
-State that is also set outside effects, such as an input draft the user edits, isn't derived, so this rule skips it. [`noAdjustStateOnPropChange`](#noadjuststateonpropchange) reports it when a prop changes it. Complete `if`/`else` chains that assign literals based on props or state are also reported here. State updated asynchronously (`.then`/`.catch`/`.finally`, `async`/`await`, timers), accumulated from its previous value across effects, or guarded as a one-time default/snapshot is skipped.
+State that is also set outside effects, such as an input draft the user edits, isn't derived, so this rule skips it. [`noAdjustStateOnPropChange`](#noadjuststateonpropchange) reports it when a prop changes it. Complete `if`/`else` chains that assign literals based on props or state are also reported here. State updated asynchronously (`.then`/`.catch`/`.finally`, `async`/`await`, timers), accumulated from its previous value across effects, or guarded as a one-time default/snapshot is skipped. It also traces values destructured from hooks called with props (`const { data } = useEmbed(id)`) and from custom `use*Context()` hooks.
 
 ### `noChainStateUpdates`
 
@@ -223,6 +223,8 @@ useEffect(() => {
 ```
 
 Set both values in the event handler that changes `round`. [Learn more](https://react.dev/learn/you-might-not-need-an-effect#chains-of-computations)
+
+It also checks helpers declared in the component that only set state: calling setters, pure functions, or `.push()` on a local array. Helpers that touch the browser are skipped.
 
 ### `noEventHandler`
 
@@ -237,7 +239,11 @@ useEffect(() => {
 
 Call `submit(form)` from the event handler that calls `setForm`. [Learn more](https://react.dev/learn/you-might-not-need-an-effect#sharing-logic-between-event-handlers)
 
-Conditions that only update state are covered by the state rules, so this rule stays quiet for them.
+Conditions that only update state are covered by the state rules, so this rule stays quiet for them. It also ignores setters destructured from a hook (`const { setValue } = useForm()`), `.test()` on stateless regexes, and `.push()` on an array created inside the effect.
+
+The rule reads the outer `if` guard and ignores nested ones (`if (show) { if (cookieDays) setCookie(...) }`). An alias in the dependency array (`const shouldSubmit = draft.length > 0`) counts as the state it reads. It skips boolean flags set to `true` once in another effect, flags written only by an Effect Event, and virtualizer scroll calls (`scrollToIndex`, `scrollToOffset`, `scrollBy`).
+
+When a prop drives the guard, the message suggests the parent's event handler. If the prop syncs with a server, URL or other external state, the effect may be fine.
 
 ### `noFetchWithoutCleanup`
 
@@ -278,6 +284,8 @@ function List({ items }) {
 
 Adjust the state during render when `items` changes, or store an ID instead of the selected item. [Learn more](https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes)
 
+The message names the prop that causes the update, even through one local variable. It prefers data props over early-return guards, controller objects and unrelated side effects. Effects that reset several states behind an open guard are left to [`noResetAllStateOnPropChange`](#noresetallstateonpropchange).
+
 ### `noResetAllStateOnPropChange`
 
 ```tsx
@@ -291,7 +299,7 @@ function ProfilePage({ userId }) {
 }
 ```
 
-Render the component with `key={userId}`. React then resets all its state when `userId` changes. When the resets are guarded by a visibility prop such as `isOpen`, `open`, or `visible`, the diagnostic instead recommends conditional mounting (`{isOpen && <Form />}`) or resetting in the open handler (and still suggests `key={id}` when an identifying prop is also in the dependency array). [Learn more](https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes)
+Render the component with `key={userId}`. React then resets all its state when `userId` changes. When the resets are guarded by a visibility prop such as `isOpen`, `open`, or `visible`, the diagnostic instead recommends conditional mounting (`{isOpen && <Form />}`) or resetting in the open handler (and still suggests `key={id}` when an identifying prop is also in the dependency array). A ref-tracked open transition — `if (isFlowActive && !wasActiveRef.current)` with an unconditional `wasActiveRef.current = isFlowActive` after it — gets the same advice. [Learn more](https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes)
 
 ### `noPassDataToParent`
 
@@ -393,13 +401,15 @@ function Greeting({ name }) {
 The GritQL rules match names, not bindings, and follow data through one local variable only. Because of this:
 
 - They follow one `const` setter alias declared in the component, such as `const reset = setUser`. `noResetAllStateOnPropChange` and `noExternalStoreSubscription` also follow one declared in an effect. They miss chains of aliases and destructured aliases. `let` aliases are skipped on purpose, as upstream does.
-- **`noDerivedState` misses wrapper setters and helper calls.** `noResetAllStateOnPropChange` follows one synchronous, no-argument helper declared in the component, such as `const resetUser = () => setUser(null)`. It skips helpers that call other helpers, async helpers and helpers wrapped in `useCallback`.
+- **`noDerivedState` misses wrapper setters and helper calls.** `noResetAllStateOnPropChange` follows one synchronous, no-argument helper declared in the component, such as `const resetUser = () => setUser(null)`. It skips helpers that call other helpers, async helpers and helpers wrapped in `useCallback`. `noChainStateUpdates` also follows state-only helpers (see [`noChainStateUpdates`](#nochainstateupdates)).
 - **They miss renamed imports**, such as `import { useEffect as useFx }`.
 - A setter called inside a renamed effect hook counts as a write outside effects, so `noDerivedState` skips that state.
 - Only `noPassLiveStateToParent` and `noPassDataToParent` follow props destructured after the signature.
 - **They can report shadowed names.** A local `const error` in an effect counts as the state variable `error`.
 - **`noEventHandler` reports at most once per effect**, preferring a non-early-return `if` guard over an early-return bail-out guard.
 - **`noChainStateUpdates` skips two guard patterns:** one-shot boolean latch flags written only as `setFlag(true)` inside the same `if (!flag ...)` effect, and negated boolean guards (`if (!isFocused)`) whose setter argument reads a non-state, non-callable dependency from the effect's dependency array.
+- **`noAdjustStateOnPropChange` skips the whole effect** when it sets the state asynchronously anywhere (`.then`, `.catch`, `.finally`, `await`), even if another branch sets it synchronously.
+- **`noEventHandler` can't tell a user-driven prop from a prop that syncs with a server, URL or editor**, and can't prove your helpers are pure. A call to a helper that does more than set state counts as a side effect.
 
 `noInitializeState` doesn't report an effect with no dependency array. `noSetStateInEffectWithoutDeps` reports it.
 
