@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
 
+export function SingleStateReset({ id }: { id: string }) {
+  const [draft, setDraft] = useState('');
+  useEffect(() => {
+    setDraft(''); // expect: noAdjustStateOnPropChange
+  }, [id]);
+  return draft;
+}
+
 export function useSelection({ items }: { items: string[] }) {
   const [selection, setSelection] = useState<string | null>(null);
   useEffect(() => {

@@ -51,7 +51,7 @@ export function Like({ fetched, likes }: { fetched: boolean; likes: string[] }) 
 
 export function GuardedReset({ items }: { items: string[] }) {
   const [selection, setSelection] = useState<string | null>(null);
-  useEffect(() => { // expect: noResetAllStateOnPropChange
+  useEffect(() => {
     if (!items.length) return;
     setSelection(null); // expect: noAdjustStateOnPropChange
   }, [items]);
