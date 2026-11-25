@@ -93,3 +93,87 @@ export function HookSetterAndSideEffect({ streaming }: { streaming: boolean }) {
 
   return <div hidden={!open} />;
 }
+
+declare function useController<T>(initial?: T): { setValue: (...values: T[]) => void };
+
+export function GenericOptionalHookSetters({ streaming }: { streaming: boolean }) {
+  const { setValue } = useController<boolean>(false);
+  const { setValue: setOther } = useController<boolean>();
+
+  useEffect(() => {
+    if (streaming) {
+      setValue();
+      setOther?.(computeNext(streaming), true);
+    }
+  }, [streaming]);
+
+  useEffect(() => {
+    if (streaming) return;
+    setOther?.();
+  }, [streaming]);
+
+  return null;
+}
+
+export function MemberSetter(props: { isReady: boolean; setOpen: (value: boolean) => void }) {
+  const [, setOpen] = useDisclosureState(false);
+
+  useEffect(() => {
+    if (props.isReady) props.setOpen(true); // expect: noEventHandler
+  }, [props.isReady]);
+
+  return <button type="button" onClick={() => setOpen(true)} />;
+}
+
+export function EffectLocalShadowedSetter({ streaming }: { streaming: boolean }) {
+  const [open, setOpen] = useDisclosureState(false);
+
+  useEffect(() => {
+    const setOpen = track;
+    if (streaming) setOpen('open'); // expect: noEventHandler
+  }, [streaming]);
+
+  return <button type="button" hidden={!open} onClick={() => setOpen(true)} />;
+}
+
+export function ShadowedSetterScopes({ streaming }: { streaming: boolean }) {
+  const [, setOpen] = useDisclosureState(false);
+
+  useEffect(() => {
+    const { track: setOpen } = { track };
+    if (streaming) setOpen('open'); // expect: noEventHandler
+  }, [streaming]);
+
+  useEffect(() => {
+    if (streaming) { // expect: noEventHandler
+      const setOpen = track;
+      setOpen('open');
+    }
+  }, [streaming]);
+
+  useEffect(() => {
+    function setOpen() {
+      track('open');
+    }
+    if (streaming) setOpen(); // expect: noEventHandler
+  }, [streaming]);
+
+  useEffect(() => {
+    {
+      var setOpen = track;
+    }
+    if (streaming) setOpen('open'); // expect: noEventHandler
+  }, [streaming]);
+
+  useEffect(() => {
+    {
+      const setOpen = track;
+      void setOpen;
+    }
+    const helper = (setOpen: () => void) => setOpen();
+    void helper;
+    if (streaming) setOpen(true);
+  }, [streaming]);
+
+  return null;
+}

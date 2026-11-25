@@ -812,10 +812,10 @@ pattern enclosing_function($name, $params, $body) {
 }
 // prelude:end
 pattern hook_setter($component, $setter) {
-  $setter where {
+  $setter as $setterUse where {
     $setter <: identifier_reference(),
     $setter <: r"set[A-Z][A-Za-z0-9_$]*",
-    $component <: contains `const $binding = $hookCall` where {
+    $component <: contains `const $binding = $hookCall` as $hookDeclaration where {
       $hookCall <: or {
         `$hook($...)`,
         `$hook<$_>($...)`,
@@ -831,16 +831,48 @@ pattern hook_setter($component, $setter) {
         JsInitializerClause(),
         JsComputedMemberName()
       } }
-    } until declaration_boundary()
+    } until declaration_boundary(),
+    $setterUse <: not within or {
+      function_node(),
+      JsBlockStatement(),
+      JsCatchClause(),
+      JsForStatement(),
+      JsForInStatement(),
+      JsForOfStatement()
+    } as $scope where {
+      $scope <: within $component,
+      $scope <: contains and { $setter,
+      JsIdentifierBinding() } as $shadowBinding where {
+        $shadowBinding <: not within $hookDeclaration,
+        $shadowBinding <: not within or {
+          function_node(),
+          JsBlockStatement(),
+          JsCatchClause(),
+          JsForStatement(),
+          JsForInStatement(),
+          JsForOfStatement()
+        } as $innerScope where {
+          $innerScope <: not $scope,
+          $innerScope <: within $scope,
+          $innerScope <: not `function $setter($...) { $... }`,
+          or {
+            $innerScope <: function_node(),
+            $shadowBinding <: not within and { JsVariableDeclaration(),
+            r"(?s)var\s.*" }
+          }
+        }
+      } until or {
+        JsInitializerClause(),
+        JsComputedMemberName(),
+        JsExpressionStatement(),
+        JsReturnStatement()
+      }
+    }
   }
 }
 
 pattern event_side_effect_call($component) {
   side_effect_call($component) as $call where {
-    $call <: not or {
-      `$hSetter($...)`,
-      `$hSetter?.($...)`
-    } where { $hSetter <: hook_setter($component, $hSetter) },
     $call <: not within or {
       `$hSetter($...)`,
       `$hSetter?.($...)`

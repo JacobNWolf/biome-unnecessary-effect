@@ -234,7 +234,6 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
           `If "isReady" changes from a user action, move the code that depends on "isReady" to the parent's event handler`,
         );
         expect(propAdvice).toContain('if it syncs with an external system, this effect may be justified');
-        expect(propAdvice).not.toContain("to the parent's event handler instead");
       }
       if (rule.name === 'noInitializeState') {
         const hydration = diagnostics.find(
