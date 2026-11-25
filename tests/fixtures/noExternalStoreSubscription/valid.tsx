@@ -108,3 +108,22 @@ export function Inspector({ active }: { active: boolean }) {
     </button>
   );
 }
+
+declare const externalStore: { get(): number };
+
+// Component-level setter alias in effect, with original setter called in an event handler.
+export function AliasedEditableState() {
+  const [v, setV] = useState(0);
+  const set = setV;
+  useEffect(() => {
+    const update = () => set(externalStore.get());
+    update();
+    window.addEventListener('focus', update);
+    return () => window.removeEventListener('focus', update);
+  }, []);
+  return (
+    <button type="button" onClick={() => setV(0)}>
+      {v}
+    </button>
+  );
+}

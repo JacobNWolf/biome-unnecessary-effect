@@ -518,6 +518,34 @@ pattern enclosing_function($name, $params, $body) {
 }
 // prelude:end
 
+// Matches callback-named props (`onChange`, `props.onChange`) rather than emitters like `connection.on` or `subscribe`.
+pattern callback_prop($params) {
+  or {
+    $prop where {
+      $prop <: identifier_reference(),
+      $prop <: r"^on[A-Z][A-Za-z0-9_$]*$",
+      $params <: contains and { JsIdentifierBinding(),
+      $prop } until JsInitializerClause()
+    },
+    `$obj.$prop` where {
+      $obj <: binding_name(),
+      $prop <: r"^on[A-Z][A-Za-z0-9_$]*$",
+      $params <: contains and { JsIdentifierBinding(),
+      $obj } until JsInitializerClause()
+    }
+  }
+}
+
+pattern callback_prop_ref($scope, $params) {
+  or {
+    callback_prop($params),
+    $alias where {
+      $alias <: identifier_reference(),
+      $scope <: contains `const $alias = $src` where { $src <: callback_prop($params) } until declaration_boundary()
+    }
+  }
+}
+
 // Rooted on each Effect Event declaration, so this reports the first misuse of each Effect Event.
 or {
   `const $event = useEffectEvent($_)`,
@@ -526,7 +554,10 @@ or {
   $declaration <: within enclosing_function($unused1, $params, $component),
   $component <: contains or {
     JsxExpressionAttributeValue() as $use where { $use <: contains $event until function_node() },
-    `$fn($args)` as $use where {
+    or {
+      `$fn($args)`,
+      `$fn?.($args)`
+    } as $use where {
       $fn <: not or {
         effect_hook(),
         mount_hook(),
@@ -537,7 +568,7 @@ or {
       // Handing an Effect Event to a timer or an emitter from inside an effect is allowed,
       // unless it escapes via a parent callback prop.
       or {
-        $fn <: parent_callback($component, $params),
+        $fn <: callback_prop_ref($component, $params),
         and {
           $use <: not within `$hook($_, $_)` where {
             $hook <: or {

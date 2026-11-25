@@ -25,3 +25,16 @@ export function useWaveform(canvas: HTMLCanvasElement, progress: number) {
 }
 
 declare function draw(progress: number): void;
+
+// An async function without await doesn't cross an async boundary before reading the ref.
+export function useAsyncNoAwait(value: string) {
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = value; // expect: preferUseEffectEvent
+  }, [value]);
+  useEffect(() => {
+    (async () => {
+      console.log(valueRef.current);
+    })();
+  }, []);
+}

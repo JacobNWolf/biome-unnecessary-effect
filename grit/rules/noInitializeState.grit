@@ -538,7 +538,7 @@ pattern enclosing_function($name, $params, $body) {
   },
   or {
     and {
-      $name <: not r"^use(?:IsClient|Hydrated|IsHydrated|Mounted|IsMounted)$",
+      $name <: not r"^use(?:IsClient|Client|IsBrowser|Hydrated|IsHydrated|HasHydrated|Mounted|IsMounted|HasMounted)$",
       $arg <: `true`,
       $component <: contains state_declaration($state, $original, $initial) where {
         $initial <: `false`

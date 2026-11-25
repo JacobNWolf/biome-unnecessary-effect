@@ -19,9 +19,10 @@ export function useSave(data: string, save: (data: string) => void) {
 }
 
 // Literal assignments and mount-only effects are flags, not latest-value mirrors.
-export function useMountFlag(initialValue: string) {
+export function useMountFlag(initialValue: string, dep: number) {
   const hasMountedRef = useRef(false);
   const initialRef = useRef('');
+  const flagRef = useRef(false);
   useEffect(() => {
     hasMountedRef.current = true;
   }, []);
@@ -29,10 +30,13 @@ export function useMountFlag(initialValue: string) {
     initialRef.current = initialValue;
   }, []);
   useEffect(() => {
-    if (hasMountedRef.current && initialRef.current) {
+    flagRef.current = true;
+  }, [dep]);
+  useEffect(() => {
+    if (hasMountedRef.current && initialRef.current && flagRef.current) {
       console.log('ready');
     }
-  }, [initialValue]);
+  }, [initialValue, dep]);
 }
 
 declare function saveContent(draft: string): Promise<void>;
