@@ -154,25 +154,25 @@ This plugin doesn't check dependency arrays or hook order. Biome's built-in rule
 
 ## Rules
 
-| Rule                                                              | Finds                                                 | Preset      |
-| ----------------------------------------------------------------- | ----------------------------------------------------- | ----------- |
-| [`noEmptyEffect`](#noemptyeffect)                                 | Effects with an empty body                            | recommended |
-| [`noInitializeState`](#noinitializestate)                         | State set once on mount                               | recommended |
-| [`noDerivedState`](#noderivedstate)                               | State computed from other state or props              | recommended |
-| [`noChainStateUpdates`](#nochainstateupdates)                     | State set because other state changed                 | recommended |
-| [`noEventHandler`](#noeventhandler)                               | Effects that do the work of an event handler          | recommended |
-| [`noFetchWithoutCleanup`](#nofetchwithoutcleanup)                 | Requests with no cleanup                              | recommended |
-| [`noPassLiveStateToParent`](#nopasslivestatetoparent)             | State sent to a parent callback                       | recommended |
-| [`noAdjustStateOnPropChange`](#noadjuststateonpropchange)         | State set because a prop changed                      | recommended |
-| [`noResetAllStateOnPropChange`](#noresetallstateonpropchange)     | All state reset because a prop changed                | recommended |
-| [`noPassDataToParent`](#nopassdatatoparent)                       | Fetched data sent to a parent callback                | recommended |
-| [`noExternalStoreSubscription`](#noexternalstoresubscription)     | Subscriptions that `useSyncExternalStore` can replace | recommended |
-| [`noEffectEventOutsideEffect`](#noeffecteventoutsideeffect)       | Effect Events called outside an effect                | recommended |
-| [`noPassingEffectEvent`](#nopassingeffectevent)                   | Effect Events passed to components or hooks           | recommended |
-| [`noAsyncEffectCallback`](#noasynceffectcallback)                 | `async` effect callbacks                              | recommended |
-| [`noSetStateInEffectWithoutDeps`](#nosetstateineffectwithoutdeps) | State set in an effect with no dependency array       | recommended |
-| [`preferUseEffectEvent`](#preferuseeffectevent)                   | Refs that only copy the latest value                  | react19     |
-| [`noDerivedStateDeep`](#noderivedstatedeep)                       | The same as `noDerivedState`, with more data flow     | deep        |
+| Rule                                                              | Finds                                                          | Preset      |
+| ----------------------------------------------------------------- | -------------------------------------------------------------- | ----------- |
+| [`noEmptyEffect`](#noemptyeffect)                                 | Effects with an empty body                                     | recommended |
+| [`noInitializeState`](#noinitializestate)                         | State set once on mount                                        | recommended |
+| [`noDerivedState`](#noderivedstate)                               | State computed from other state or props                       | recommended |
+| [`noChainStateUpdates`](#nochainstateupdates)                     | State set because other state changed                          | recommended |
+| [`noEventHandler`](#noeventhandler)                               | Effects that do the work of an event handler                   | recommended |
+| [`noFetchWithoutCleanup`](#nofetchwithoutcleanup)                 | Requests with no cleanup                                       | recommended |
+| [`noPassLiveStateToParent`](#nopasslivestatetoparent)             | State sent to a parent callback                                | recommended |
+| [`noAdjustStateOnPropChange`](#noadjuststateonpropchange)         | State set because a prop changed                               | recommended |
+| [`noResetAllStateOnPropChange`](#noresetallstateonpropchange)     | All state reset because a prop changed                         | recommended |
+| [`noPassDataToParent`](#nopassdatatoparent)                       | Fetched data sent to a parent callback                         | recommended |
+| [`noExternalStoreSubscription`](#noexternalstoresubscription)     | Subscriptions that `useSyncExternalStore` can replace          | recommended |
+| [`noEffectEventOutsideEffect`](#noeffecteventoutsideeffect)       | Effect Events called outside an effect                         | recommended |
+| [`noPassingEffectEvent`](#nopassingeffectevent)                   | Effect Events passed to components, hooks, or parent callbacks | recommended |
+| [`noAsyncEffectCallback`](#noasynceffectcallback)                 | `async` effect callbacks                                       | recommended |
+| [`noSetStateInEffectWithoutDeps`](#nosetstateineffectwithoutdeps) | State set in an effect with no dependency array                | recommended |
+| [`preferUseEffectEvent`](#preferuseeffectevent)                   | Refs that only copy the latest value                           | react19     |
+| [`noDerivedStateDeep`](#noderivedstatedeep)                       | The same as `noDerivedState`, with more data flow              | deep        |
 
 The examples below show code that each rule reports.
 
@@ -194,6 +194,8 @@ useEffect(() => {
 ```
 
 Pass the value to `useState('Ada')`. For values that differ between server and client, use `useSyncExternalStore`. [Learn more](https://react.dev/reference/react/useState)
+
+Dedicated hydration hooks (`useIsClient`, `useHydrated`, `useHasMounted`, and similar names) are exempted for the `useState(false)` to `setX(true)` mount pattern.
 
 ### `noDerivedState`
 
@@ -318,6 +320,8 @@ useEffect(() => {
 
 Read the value with `useSyncExternalStore`. [Learn more](https://react.dev/learn/you-might-not-need-an-effect#subscribing-to-an-external-store)
 
+State whose setter is also used outside effects (for example, in an event handler) is treated as editable local UI state and skipped.
+
 ### `noEffectEventOutsideEffect`
 
 ```tsx
@@ -334,7 +338,7 @@ const onTick = useEffectEvent(() => props.onTick());
 return <Timer onTick={onTick} />;
 ```
 
-Declare the Effect Event next to the effect that calls it. [Learn more](https://react.dev/reference/react/useEffectEvent)
+Declare the Effect Event next to the effect that calls it. This also flags passing an Effect Event to a parent callback prop (`onChange`, `props.onChange`) from inside an effect, while allowing timers and emitter subscriptions (`connection.on`, `subscribe`). [Learn more](https://react.dev/reference/react/useEffectEvent)
 
 ### `noAsyncEffectCallback`
 
@@ -355,7 +359,7 @@ useEffect(() => {
 });
 ```
 
-The effect runs after every render and sets state, so the component renders forever. Add a dependency array, or compute the value during render. [Learn more](https://react.dev/reference/react/useEffect#my-effect-keeps-re-running-in-an-infinite-cycle)
+The effect runs after every render and sets state, so the component renders forever. Add a dependency array, or compute the value during render. Effects that bail out early by comparing against a ref (`if (key === lastKey.current) return;`) before setting state are skipped. [Learn more](https://react.dev/reference/react/useEffect#my-effect-keeps-re-running-in-an-infinite-cycle)
 
 ### `preferUseEffectEvent`
 
@@ -366,7 +370,7 @@ useEffect(() => {
 });
 ```
 
-On React 19.2 and newer, read `callback` in a `useEffectEvent` function. This rule is only in the `react19` preset, because the plugin can't find your React version. [Learn more](https://react.dev/reference/react/useEffectEvent)
+On React 19.2 and newer, read `callback` in a `useEffectEvent` function. This rule is only in the `react19` preset, because the plugin can't find your React version. Literal assignments, mount-only (`[]`) effects, and refs read inside `async`/`await` functions are skipped. [Learn more](https://react.dev/reference/react/useEffectEvent)
 
 ### `noDerivedStateDeep`
 

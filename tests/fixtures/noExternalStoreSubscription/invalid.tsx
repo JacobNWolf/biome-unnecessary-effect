@@ -67,3 +67,32 @@ export function useCustomSubscription() {
   }, []);
   return count;
 }
+
+export function useOnlineStatusTuple() {
+  const [isOnline, setIsOnline] = useState(true);
+  useEffect(() => {
+    function updateState() {
+      setIsOnline(navigator.onLine);
+    }
+    updateState(); // expect: noExternalStoreSubscription
+    window.addEventListener('online', updateState);
+    return () => window.removeEventListener('online', updateState);
+  }, []);
+  return [isOnline, setIsOnline] as const;
+}
+
+declare function StoreChild(props: { setV: number; value: number }): null;
+declare const simpleStore: { get(): number };
+
+export function NonReferenceSetterNames() {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    const update = () => setV(simpleStore.get());
+    update(); // expect: noExternalStoreSubscription
+    window.addEventListener('focus', update);
+    return () => window.removeEventListener('focus', update);
+  }, []);
+  const obj = { setV: 1 };
+  const fromWindow = (window as { setV?: number }).setV ?? obj.setV;
+  return <StoreChild setV={fromWindow} value={v} />;
+}
