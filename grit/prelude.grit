@@ -159,11 +159,12 @@ pattern binding_name() {
   not r"(?:true|false|null|undefined|this)" }
 }
 
-// Excludes property names (JsName); callees bind JsIdentifierExpression, references bind JsReferenceIdentifier.
+// Excludes property names (JsName); callees bind JsIdentifierExpression, references bind JsReferenceIdentifier, JSX components bind JsxReferenceIdentifier.
 pattern identifier_reference() {
   and { or {
     JsReferenceIdentifier(),
-    JsIdentifierExpression()
+    JsIdentifierExpression(),
+    JsxReferenceIdentifier()
   },
   binding_name() }
 }
@@ -548,7 +549,6 @@ pattern state_only_helper($component) {
     } until declaration_boundary()
   }
 }
-
 // Calls inside setter arguments compute the next value rather than synchronize an external system.
 pattern side_effect_call($component) {
   JsCallExpression() as $call where {
