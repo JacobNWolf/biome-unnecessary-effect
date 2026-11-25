@@ -5,8 +5,32 @@ declare function useImageEditor(): { editingItem: string | null };
 declare function focusCanvas(): void;
 declare function measureAndUpdate(): void;
 declare function track(value: unknown): void;
-declare const validUrlRegex: RegExp;
+declare const globalUrlRegex: RegExp;
+declare const buckets: { get(key: string): string[] };
+const validUrlRegex = /^https?:\/\/\S+$/i;
+const typedUrlRegex: RegExp = /^https?:\/\/\S+$/i;
+const globalFlagRegex = /^https?:\/\/\S+/g;
 declare const externalStore: { items: string[] };
+
+export function ResettableFlagStillReported({ clicked, onDone }: { clicked: boolean; onDone: () => void }) {
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    openAsync().then(() => {
+      setPending(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    setPending(clicked);
+  }, [clicked]);
+
+  useEffect(() => {
+    if (pending) onDone(); // expect: noEventHandler
+  }, [pending, onDone]);
+
+  return null;
+}
 
 export function CrossEffectBooleanLatch({ onDone }: { onDone: () => void }) {
   const [opened, setOpened] = useState(false);
@@ -84,9 +108,15 @@ export function EffectLocalPushAndRegexTest({
 
   const highlightErrors = () => {
     const next: string[] = [];
-    if (!url?.trim() || !validUrlRegex.test(url.trim())) {
+    if (!url?.trim() || !validUrlRegex.test(url.trim()) || !typedUrlRegex?.test(url.trim())) {
       next.push('url');
     }
+    const shadow = () => {
+      let next = 0;
+      next = 1;
+      return next;
+    };
+    void shadow;
     setErrors(next);
   };
 
@@ -108,6 +138,92 @@ export function EffectLocalPushAndRegexTest({
   return errors.join(',');
 }
 
+export function StatefulRegexHelperStillReported({
+  url,
+  active,
+  validUrlRegex: shadowedRegex,
+}: {
+  url: string;
+  active: boolean;
+  validUrlRegex: RegExp;
+}) {
+  const [valid, setValid] = useState(false);
+
+  const validate = () => {
+    const ok = globalUrlRegex.test(url);
+    setValid(ok);
+  };
+
+  useEffect(() => {
+    if (active) { // expect: noEventHandler
+      validate(); // expect: noDerivedStateDeep
+    }
+  }, [active]);
+
+  useEffect(() => {
+    if (active) { // expect: noEventHandler
+      const ok = globalFlagRegex.test(url);
+      setValid(ok); // expect: noAdjustStateOnPropChange, noDerivedStateDeep
+    }
+  }, [active, url]);
+
+  useEffect(() => {
+    if (active) { // expect: noEventHandler
+      const ok = /https?:\/\/\S+/y.test(url);
+      setValid(ok); // expect: noAdjustStateOnPropChange, noDerivedStateDeep
+    }
+  }, [active, url]);
+
+  useEffect(() => {
+    if (active) { // expect: noEventHandler
+      const ok = shadowedRegex.test(url);
+      setValid(ok); // expect: noAdjustStateOnPropChange, noDerivedStateDeep
+    }
+  }, [active, url, shadowedRegex]);
+
+  return valid;
+}
+
+export function ShadowedParamRegexStillReported({
+  url,
+  active,
+  validUrlRegex,
+}: {
+  url: string;
+  active: boolean;
+  validUrlRegex: RegExp;
+}) {
+  const [valid, setValid] = useState(false);
+
+  useEffect(() => {
+    if (active) { // expect: noEventHandler
+      const ok = validUrlRegex.test(url);
+      setValid(ok); // expect: noDerivedState, noDerivedStateDeep
+    }
+  }, [active, url, validUrlRegex]);
+
+  return valid;
+}
+
+export function ReassignedLocalArrayHelperStillReported({ active }: { active: boolean }) {
+  const [items, setItems] = useState<string[]>([]);
+
+  const collect = () => {
+    let next: string[] = [];
+    next = externalStore.items;
+    next.push('x');
+    setItems(next);
+  };
+
+  useEffect(() => {
+    if (active) { // expect: noEventHandler
+      collect();
+    }
+  }, [active]);
+
+  return items.length;
+}
+
 export function NonLocalArrayPushStillReported({ active }: { active: boolean }) {
   const componentArray: string[] = [];
 
@@ -121,6 +237,13 @@ export function NonLocalArrayPushStillReported({ active }: { active: boolean }) 
     if (active) { // expect: noEventHandler
       const aliased = externalStore.items;
       aliased.push('x');
+    }
+  }, [active]);
+
+  useEffect(() => {
+    if (active) { // expect: noEventHandler
+      const stored = buckets.get('key');
+      stored.push('x');
     }
   }, [active]);
 

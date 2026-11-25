@@ -270,7 +270,11 @@ pattern effect_only_state($scope, $body, $source) {
           $ee <: invoked_in($body),
           $eeCall <: `$eeHook($eeCb)` where { $eeHook <: effect_event_hook(), $eeCb <: contains `$flagSetter($_)` }
         } until declaration_boundary(),
-        and { $flagInit <: `false`, $scope <: contains `$flagSetter(true)` }
+        and {
+          $flagInit <: `false`,
+          $scope <: contains `$flagSetter(true)`,
+          $scope <: not contains `$flagSetter($flagArg)` where { $flagArg <: not `true` }
+        }
       }
     } until declaration_boundary()
   }
@@ -543,19 +547,64 @@ pattern async_or_fetch_effect() {
   }
 }
 
+// `.test()` on a `g`/`y` regex advances its shared `lastIndex`; only regexes without those flags or freshly built ones are safe.
+pattern stateless_regex_literal() {
+  and { JsRegexLiteralExpression(),
+  not r"^[\s\S]*/[a-z]*[gy][a-z]*$" }
+}
+
+pattern stateless_regex_const($re) {
+  or {
+    `const $re = $lit`,
+    `const $re: $_ = $lit`
+  } where { $lit <: stateless_regex_literal() }
+}
+
+pattern stateless_regex() {
+  or {
+    stateless_regex_literal(),
+    `new RegExp($...)`,
+    // Binding matches rebind $re; keep the use site for parameter-shadowing checks.
+    $re as $reUse where {
+      $re <: identifier_reference(),
+      $program <: contains stateless_regex_const($re),
+      $program <: not contains JsVariableDeclaration() as $reDecl where {
+        $reDecl <: contains and { JsIdentifierBinding(),
+        $re } until JsInitializerClause(),
+        $reDecl <: not stateless_regex_const($re)
+      },
+      $reUse <: not within function_node() as $fn where {
+        $fn <: contains JsParameters() as $fnParams where {
+          $fnParams <: contains and { JsIdentifierBinding(),
+          $re } until JsInitializerClause()
+        } until JsFunctionBody()
+      }
+    }
+  }
+}
+
 // Pure read/transform methods and constructors that are not external side effects.
 // Standalone expression statements stay side effects so calls like `router.replace()` or `api.get()` are not skipped.
 // Snippet and regex forms avoid JsCallExpression(callee = ...) and JsStaticMemberExpression(member = ...), which Biome 2.4.5 cannot compile.
 pattern pure_call() {
   or {
     `$_.$method($...)` where {
-      $method <: r"^(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|test|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
+      $method <: r"^(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
+    },
+    `$re.test($...)` where { $re <: stateless_regex() },
+    or {
+      `$callee($...)`,
+      `$callee?.($...)`
+    } where {
+      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
     },
     or {
       `$callee($...)`,
       `$callee?.($...)`
     } where {
-      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|test|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
+      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.test$",
+      $callee <: JsStaticMemberExpression(object=$re),
+      $re <: stateless_regex()
     },
     `$fn($...)` where {
       $fn <: r"^(?:Boolean|String|Number|BigInt|Array|Set|Map|parseInt|parseFloat|isNaN|isFinite|isEqual|encodeURIComponent|decodeURIComponent)$"
@@ -574,6 +623,26 @@ pattern pure_call() {
   }
 }
 
+// Initializers that always allocate a new array; `.get()`/`.find()` and similar can return a stored one.
+pattern fresh_array() {
+  or {
+    JsArrayExpression(),
+    `$_.$method($...)` where {
+      $method <: r"^(?:filter|map|flatMap|slice|concat|split|flat|toSorted|toReversed|toSpliced|with)$"
+    },
+    or {
+      `$callee($...)`,
+      `$callee?.($...)`
+    } where {
+      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.(?:filter|map|flatMap|slice|concat|split|flat|toSorted|toReversed|toSpliced|with)$"
+    },
+    `Array.$method($...)` where { $method <: r"^(?:from|of)$" },
+    `Object.$method($...)` where { $method <: r"^(?:keys|values|entries|getOwnPropertyNames)$" },
+    `Array($...)`,
+    `new Array($...)`
+  }
+}
+
 // `.push()` on a local array initialized inside the same function block (not component- or module-level mutation).
 pattern local_array_push() {
   `$localArr.push($...)` as $pushCall where {
@@ -583,17 +652,20 @@ pattern local_array_push() {
       JsBlockStatement()
     } as $block where {
       $pushCall <: direct_in_body($block),
-      $block <: contains or {
-        `const $localArr = $arrInit`,
-        `const $localArr: $_ = $arrInit`,
-        `let $localArr = $arrInit`,
-        `let $localArr: $_ = $arrInit`
-      } where {
-        $arrInit <: or {
-          JsArrayExpression(),
-          pure_call()
+      or {
+        $block <: contains or {
+          `const $localArr = $arrInit`,
+          `const $localArr: $_ = $arrInit`
+        } where { $arrInit <: fresh_array() } until function_node(),
+        and {
+          $block <: contains or {
+            `let $localArr = $arrInit`,
+            `let $localArr: $_ = $arrInit`
+          } where { $arrInit <: fresh_array() } until function_node(),
+          // Node form also covers `??=`/`||=`/`+=`, whose snippets Biome cannot compile.
+          $block <: not contains JsAssignmentExpression(left=$localArr)
         }
-      } until function_node()
+      }
     }
   }
 }
