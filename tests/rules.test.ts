@@ -156,6 +156,13 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
           ({ location }) => location.path.endsWith('selfDependent.tsx') && location.start.line === 33,
         );
         expect(chain?.message).toContain('changes "other"');
+        const helperAt = (line: number) =>
+          diagnostics.find(
+            ({ location }) => location.path.endsWith('stateOnlyHelper.tsx') && location.start.line === line,
+          )?.message;
+        expect(helperAt(14)).toContain('Update "name" in the same event handler that changes "isOpen"');
+        expect(helperAt(32)).toContain('changes "step"');
+        expect(helperAt(63)).toContain('Update "name" in the same event handler that changes "isOpen"');
       }
       if (rule.name === 'noResetAllStateOnPropChange') {
         const generic = diagnostics.find(({ location }) => location.path.endsWith('keyAdvice.tsx'));

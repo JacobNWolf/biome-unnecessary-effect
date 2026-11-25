@@ -811,8 +811,11 @@ pattern enclosing_function($name, $params, $body) {
 }
 // prelude:end
 
-`$setter($arg)` as $call where {
-  $setter <: binding_name(),
+or {
+  `$callee($...)`,
+  `$callee?.($...)`
+} as $call where {
+  $callee <: binding_name(),
   or {
     $call <: within `$hook($cb, $deps)` as $effect where { $hook <: effect_hook() },
     $call <: within `useCustomCompareEffect($cb, $deps, $comparator)` as $effect
@@ -822,7 +825,28 @@ pattern enclosing_function($name, $params, $body) {
   $call <: direct_in_body($body),
   $body <: not contains cleanup_return() until function_node(),
   $call <: within enclosing_function($unused1, $params, $component),
-  $setter <: state_setter($component, $state, $setter),
+  or {
+    and { $call <: `$callee($arg)`, $callee <: state_setter($component, $state, $callee) },
+    and {
+      $call <: state_only_helper($component),
+      $component <: contains or {
+        `const $callee = ($...) => $hBody`,
+        `function $callee($...) { $hBody }`
+      } as $helper where {
+        $helper <: not or {
+          `const $callee = async ($...) => $asyncBody`,
+          `async function $callee($...) { $asyncBody }`
+        },
+        // Later clauses do not backtrack into this search, so skip setters for states already in the deps.
+        $hBody <: contains `$s($arg)` where {
+          $s <: state_setter($component, $state, $s),
+          $arg <: not contains state_reference($component, $hBody, $unused4),
+          $deps <: not contains and { JsReferenceIdentifier(),
+          $state }
+        } until function_node()
+      } until declaration_boundary()
+    }
+  },
   $deps <: contains and { JsReferenceIdentifier(),
   binding_name() } as $dep where {
     $dep <: reads_state($component, $body, $source),
