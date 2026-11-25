@@ -540,32 +540,6 @@ pattern trigger_prop($component, $params, $body, $deps, $prop) {
   $call <: direct_in_body($body),
   $call <: within enclosing_function($unused1, $params, $component),
   $setter <: state_setter($component, $state, $setter, $original),
-  $body <: not contains or {
-    `$_.then($cb1)` where {
-      $cb1 <: contains and { JsReferenceIdentifier(),
-      $setter }
-    },
-    `$_.then($cb1, $cb2)` where {
-      or {
-        $cb1 <: contains and { JsReferenceIdentifier(),
-        $setter },
-        $cb2 <: contains and { JsReferenceIdentifier(),
-        $setter }
-      }
-    },
-    `$_.catch($cb1)` where {
-      $cb1 <: contains and { JsReferenceIdentifier(),
-      $setter }
-    },
-    `$_.finally($cb1)` where {
-      $cb1 <: contains and { JsReferenceIdentifier(),
-      $setter }
-    },
-    `async () => $aBody` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
-    `async ($_) => $aBody` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
-    `async function () { $aBody }` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
-    `async function ($_) { $aBody }` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` }
-  },
   $deps <: contains prop_or_context($component, $params, $dependencyProp) where {
     $dependencyProp <: not invoked_in($body)
   },
@@ -603,11 +577,38 @@ pattern trigger_prop($component, $params, $body, $deps, $prop) {
     and {
       $arg <: not contains prop_reference($component, $body, $params, $unused2),
       or {
-        $arg <: not contains state_reference($component, $body, $unused3),
+        $arg <: not contains JsReferenceIdentifier(),
         $arg <: contains and { JsReferenceIdentifier(),
-        $state }
+        $state },
+        $arg <: not contains state_reference($component, $body, $unused3)
       }
     }
+  },
+  $body <: not contains or {
+    `$_.then($cb1)` where {
+      $cb1 <: contains and { JsReferenceIdentifier(),
+      $setter }
+    },
+    `$_.then($cb1, $cb2)` where {
+      or {
+        $cb1 <: contains and { JsReferenceIdentifier(),
+        $setter },
+        $cb2 <: contains and { JsReferenceIdentifier(),
+        $setter }
+      }
+    },
+    `$_.catch($cb1)` where {
+      $cb1 <: contains and { JsReferenceIdentifier(),
+      $setter }
+    },
+    `$_.finally($cb1)` where {
+      $cb1 <: contains and { JsReferenceIdentifier(),
+      $setter }
+    },
+    `async () => $aBody` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
+    `async ($_) => $aBody` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
+    `async function () { $aBody }` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
+    `async function ($_) { $aBody }` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` }
   },
   register_diagnostic(span=$call, message=`Avoid adjusting state when a prop changes. Adjust "$state" during render when "$prop" changes, or restructure state so it isn't needed. See https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes`, severity="warn")
 }

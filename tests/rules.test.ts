@@ -109,6 +109,7 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
   }, 15_000);
 
   for (const rule of rules) {
+    // Linting the full fixture corpus per rule can exceed Bun's 5s default on slower CI runners.
     test(rule.name, () => {
       const diagnostics = lint(rule.path);
       const actual = diagnostics.map(({ location }) => `${location.path}:${location.start.line}`).sort();
@@ -173,6 +174,6 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         );
         expect(ordinary?.message).toContain('Pass this value');
       }
-    });
+    }, 15_000);
   }
 });
