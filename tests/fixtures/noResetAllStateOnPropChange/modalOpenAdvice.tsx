@@ -11,8 +11,8 @@ export function ScheduleModal({
   const [targetGmailVolume, setTargetGmailVolume] = useState(schedule.target_gmail_volume.toString());
   useEffect(() => { // expect: noResetAllStateOnPropChange
     if (isOpen) {
-      setTargetVolume(schedule.target_volume.toString()); // expect: noAdjustStateOnPropChange
-      setTargetGmailVolume(schedule.target_gmail_volume.toString()); // expect: noAdjustStateOnPropChange
+      setTargetVolume(schedule.target_volume.toString());
+      setTargetGmailVolume(schedule.target_gmail_volume.toString());
     }
   }, [isOpen, schedule]);
   return (
@@ -33,8 +33,8 @@ export function EarlyReturnModal({ open, itemId }: { open: boolean; itemId: stri
   const [body, setBody] = useState('');
   useEffect(() => { // expect: noResetAllStateOnPropChange
     if (!open) return;
-    setTitle(''); // expect: noAdjustStateOnPropChange
-    setBody(''); // expect: noAdjustStateOnPropChange
+    setTitle('');
+    setBody('');
   }, [open, itemId]);
   return `${title}${body}`;
 }
@@ -46,8 +46,8 @@ export function BracedReturnModal({ isModalOpen, userId }: { isModalOpen: boolea
     if (!isModalOpen) {
       return;
     }
-    setStep(0); // expect: noAdjustStateOnPropChange
-    setDraft(''); // expect: noAdjustStateOnPropChange
+    setStep(0);
+    setDraft('');
   }, [isModalOpen, userId]);
   return `${step}${draft}`;
 }
@@ -57,8 +57,8 @@ export function PropsObjectModal(props: { isOpen: boolean; itemId: string }) {
   const [b, setB] = useState('');
   useEffect(() => { // expect: noResetAllStateOnPropChange
     if (!props.isOpen) return;
-    setA(''); // expect: noAdjustStateOnPropChange
-    setB(''); // expect: noAdjustStateOnPropChange
+    setA('');
+    setB('');
   }, [props.isOpen, props.itemId]);
   return `${a}${b}`;
 }
@@ -70,8 +70,8 @@ export function ElseCloseResetModal({ visible, data }: { visible: boolean; data:
     if (visible) {
       console.debug('open');
     } else {
-      setA(''); // expect: noAdjustStateOnPropChange
-      setB(''); // expect: noAdjustStateOnPropChange
+      setA('');
+      setB('');
     }
   }, [visible, data]);
   return `${a}${b}`;
@@ -82,8 +82,8 @@ export function VisibleModal({ isVisible, data }: { isVisible: boolean; data: ob
   const [b, setB] = useState('');
   useEffect(() => { // expect: noResetAllStateOnPropChange
     if (!isVisible) return;
-    setA(''); // expect: noAdjustStateOnPropChange
-    setB(''); // expect: noAdjustStateOnPropChange
+    setA('');
+    setB('');
   }, [isVisible, data]);
   return `${a}${b}`;
 }
@@ -93,8 +93,8 @@ export function ShowModal({ show, data }: { show: boolean; data: object }) {
   const [b, setB] = useState('');
   useEffect(() => { // expect: noResetAllStateOnPropChange
     if (!show) return;
-    setA(''); // expect: noAdjustStateOnPropChange
-    setB(''); // expect: noAdjustStateOnPropChange
+    setA('');
+    setB('');
   }, [show, data]);
   return `${a}${b}`;
 }
@@ -104,8 +104,8 @@ export function ShownModal({ isShown, data }: { isShown: boolean; data: object }
   const [b, setB] = useState('');
   useEffect(() => { // expect: noResetAllStateOnPropChange
     if (!isShown) return;
-    setA(''); // expect: noAdjustStateOnPropChange
-    setB(''); // expect: noAdjustStateOnPropChange
+    setA('');
+    setB('');
   }, [isShown, data]);
   return `${a}${b}`;
 }
@@ -115,8 +115,8 @@ export function OpenedModal({ opened, data }: { opened: boolean; data: object })
   const [b, setB] = useState('');
   useEffect(() => { // expect: noResetAllStateOnPropChange
     if (!opened) return;
-    setA(''); // expect: noAdjustStateOnPropChange
-    setB(''); // expect: noAdjustStateOnPropChange
+    setA('');
+    setB('');
   }, [opened, data]);
   return `${a}${b}`;
 }

@@ -812,6 +812,8 @@ pattern enclosing_function($name, $params, $body) {
 }
 // prelude:end
 
+pattern controller_prop() { r"^(?:editor|provider|queryClient|router|fetcher)$" }
+
 // Checks $deps before scanning the component or effect body so non-dependency identifiers fail fast.
 pattern trigger_prop($component, $params, $body, $deps, $prop) {
   JsReferenceIdentifier() as $prop where {
@@ -819,6 +821,165 @@ pattern trigger_prop($component, $params, $body, $deps, $prop) {
     $prop },
     $prop <: prop_or_context($component, $params, $prop),
     $prop <: not invoked_in($body)
+  }
+}
+
+pattern arg_trigger_prop($component, $params, $body, $deps, $prop) {
+  JsReferenceIdentifier() as $ref where {
+    or {
+      $ref <: trigger_prop($component, $params, $body, $deps, $prop),
+      and {
+        or {
+          $body <: contains `const $ref = $aliasValue` until function_node(),
+          $component <: contains `const $ref = $aliasValue` until declaration_boundary()
+        },
+        $aliasValue <: or {
+          contains trigger_prop($component, $params, $body, $deps, $prop) where { $prop <: not controller_prop() },
+          contains trigger_prop($component, $params, $body, $deps, $prop)
+        }
+      }
+    }
+  }
+}
+
+// `$_` in statement position matches neither a block nor an else-if, so each shape is listed.
+pattern if_test($test) {
+  or {
+    `if ($test) { $_ }`,
+    `if ($test) $_`,
+    `if ($test) { $_ } else { $_ }`,
+    `if ($test) $_ else $_`,
+    `if ($test) { $_ } else if ($_) { $_ }`,
+    `if ($test) { $_ } else if ($_) { $_ } else { $_ }`
+  }
+}
+
+pattern early_return($test) {
+  or {
+    `if ($test) return;`,
+    `if ($test) { return; }`
+  }
+}
+
+pattern literal_arg() {
+  or {
+    not contains JsReferenceIdentifier(),
+    `undefined`
+  }
+}
+
+// A guard on state the effect itself sets seeds that state once data arrives, rather than following a prop.
+pattern seeded_state_guard($component, $body) {
+  contains and { JsReferenceIdentifier(),
+  $latch } where {
+    $component <: contains state_declaration($latch, $latchSetter, $latchInit) until declaration_boundary(),
+    $body <: contains `$latchSetter($_)` until function_node()
+  }
+}
+
+// State read in the guard drives the update: either another state changed, or data is copied into unset state.
+// A literal write to the guarded state (`if (open && !seen) setSeen(true)`) still follows the prop.
+pattern state_driven_guard($component, $body, $arg) {
+  contains and { JsReferenceIdentifier(),
+  $driver } where {
+    $component <: contains state_declaration($driver, $driverSetter, $driverInit) until declaration_boundary(),
+    or { $body <: not contains `$driverSetter($_)` until function_node(), $arg <: not literal_arg() }
+  }
+}
+
+pattern open_prop($component, $params, $openProp) {
+  or {
+    prop_or_context($component, $params, $openProp) where {
+      $openProp <: r"^(?:open|opened|visible|show|is(?:[A-Z][A-Za-z0-9]*)?(?:Open|Opened|Visible|Shown))$"
+    },
+    `$propsObj.$openMember` as $openProp where {
+      $propsObj <: prop_or_context($component, $params, $propsObj),
+      $openMember <: r"^(?:open|opened|visible|show|is(?:[A-Z][A-Za-z0-9]*)?(?:Open|Opened|Visible|Shown))$"
+    }
+  }
+}
+
+pattern open_guard($component, $params, $openProp) {
+  or {
+    early_return($guard),
+    `if ($guard) { $guardThen }` where {
+      $guardThen <: contains `$guardSetter($_)` where {
+        $guardSetter <: state_setter($component, $unusedGuardState, $guardSetter)
+      } until function_node()
+    },
+    `if ($guard) { $_ } else { $guardElse }` where {
+      $guardElse <: contains `$guardSetter($_)` where {
+        $guardSetter <: state_setter($component, $unusedGuardState, $guardSetter)
+      } until function_node()
+    }
+  } where { $guard <: contains open_prop($component, $params, $openProp) }
+}
+
+// Mirrors noResetAllStateOnPropChange's open-guard report so the same effect isn't reported once per setter here.
+pattern open_guard_full_reset($name, $component, $params, $deps) {
+  $body where {
+    $name <: r"[A-Z][A-Za-z0-9_]*",
+    // Text prefilter: this check runs for every setter call, and few effects mention an open prop.
+    $body <: r"[\s\S]*(?:open|Open|visible|Visible|show|Shown)[\s\S]*",
+    $deps <: contains prop_or_context($component, $params, $resetProp) where {
+      $resetProp <: not r"(?:is|has|should|show|can)(?:[A-Z_][A-Za-z0-9_]*|$)"
+    },
+    $body <: contains open_guard($component, $params, $unusedOpenProp) until function_node(),
+    $body <: not contains cleanup_return() until function_node(),
+    // Keep cardinality captures out of the reset search to avoid retrying every pair of states.
+    not not and {
+      $component <: contains state_declaration($firstState, $firstSetter, $firstInit) until declaration_boundary(),
+      $component <: contains state_declaration($secondState, $secondSetter, $secondInit) where {
+        $secondSetter <: not $firstSetter
+      } until declaration_boundary()
+    },
+    $component <: not contains or {
+      `const [$_] = $stateCall` where { $stateCall <: use_state_call($unusedValueOnlyInit) },
+      or {
+        `const [$_, $empty] = useState()`,
+        `const [$_, $empty] = useState<$_>()`
+      } where {
+        $body <: not contains or {
+          `$empty()`,
+          `$empty(undefined)`
+        } until function_node()
+      },
+      state_declaration($unusedOtherState, $other, $init) where {
+        $init <: r"[\s\S]+",
+        $body <: not contains or {
+          `$other($reset)`,
+          `$alias($reset)` where {
+            or {
+              $body <: contains `const $alias = $other` until function_node(),
+              $component <: contains `const $alias = $other` until declaration_boundary()
+            }
+          },
+          `$helper()` where {
+            $component <: contains or {
+              `const $helper = () => $helperBody`,
+              `function $helper() { $helperBody }`
+            } as $helperOwner until declaration_boundary(),
+            $helperOwner <: not or {
+              `const $helper = async () => $asyncBody`,
+              `async function $helper() { $asyncBody }`
+            },
+            $helperBody <: contains `$other($reset)` until function_node()
+          }
+        } where {
+          or {
+            $init <: or {
+              $reset,
+              `$reset as $_`,
+              `$reset satisfies $_`
+            },
+            $reset <: or {
+              `$init as $_`,
+              `$init satisfies $_`
+            }
+          }
+        } until function_node()
+      }
+    } until declaration_boundary()
   }
 }
 
@@ -842,6 +1003,7 @@ pattern if_else_branches($test, $then, $else) {
   $call <: direct_in_body($body),
   $call <: within enclosing_function($unused1, $params, $component),
   $setter <: state_setter($component, $state, $setter, $original),
+  $body <: not open_guard_full_reset($unused1, $component, $params, $deps),
   $deps <: contains prop_or_context($component, $params, $dependencyProp) where {
     $dependencyProp <: not invoked_in($body)
   },
@@ -856,19 +1018,57 @@ pattern if_else_branches($test, $then, $else) {
     }
   },
   or {
-    $arg <: contains trigger_prop($component, $params, $body, $deps, $prop),
+    $arg <: contains arg_trigger_prop($component, $params, $body, $deps, $prop) where {
+      $prop <: not controller_prop()
+    },
+    $arg <: contains arg_trigger_prop($component, $params, $body, $deps, $prop),
     and {
-      $arg <: not contains trigger_prop($component, $params, $body, $deps, $unusedArgProp),
+      $arg <: not contains arg_trigger_prop($component, $params, $body, $deps, $unusedArgProp),
       or {
         and {
           $call <: within `if ($test) { $_ }`,
-          $test <: contains trigger_prop($component, $params, $body, $deps, $prop)
+          $test <: not state_driven_guard($component, $body, $arg),
+          or {
+            $test <: contains trigger_prop($component, $params, $body, $deps, $prop) where {
+              $prop <: not controller_prop()
+            },
+            $test <: contains trigger_prop($component, $params, $body, $deps, $prop)
+          }
         },
         and {
           $call <: not within `if ($guard) { $_ }` where {
             $guard <: contains trigger_prop($component, $params, $body, $deps, $unusedGuardProp)
           },
-          $prop = $dependencyProp
+          $body <: not contains early_return($seedTest) where {
+            $seedTest <: seeded_state_guard($component, $body)
+          } until function_node(),
+          or {
+            $arg <: literal_arg(),
+            $call <: not within `if ($seedGuard) { $_ }` where { $seedGuard <: seeded_state_guard($component, $body) }
+          },
+          $deps <: contains prop_or_context($component, $params, $prop) where {
+            $prop <: not controller_prop(),
+            $prop <: not invoked_in($body),
+            // Guard-only props gate when a data-reading update runs; a literal update is a reset on that prop.
+            or {
+              $arg <: literal_arg(),
+              $body <: not contains early_return($earlyTest) where {
+                $earlyTest <: contains and { JsReferenceIdentifier(),
+                $prop }
+              } until function_node()
+            },
+            not and {
+              $call <: within JsIfStatement() as $dataGuard where { $dataGuard <: within $body },
+              $body <: contains side_effect_call($component) as $sideCall where {
+                $sideCall <: contains and { JsReferenceIdentifier(),
+                $prop }
+              } until function_node(),
+              $body <: not contains if_test($propTest) where {
+                $propTest <: contains and { JsReferenceIdentifier(),
+                $prop }
+              } until function_node()
+            }
+          }
         }
       }
     }
