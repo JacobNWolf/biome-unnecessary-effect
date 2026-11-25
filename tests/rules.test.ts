@@ -226,6 +226,14 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         expect(aliasedDeps(40)?.message).toContain('depends on "hasChanges"');
         expect(aliasedDeps(79)?.message).toContain('depends on "open"');
         expect(aliasedDeps(79)?.message).not.toContain('depends on "cookieDays"');
+        const propAdvice = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noEventHandler/hookDestructuredSetters.tsx') && location.start.line === 60,
+        )?.message;
+        expect(propAdvice).toContain(
+          `If "isReady" changes from a user action, move the code that depends on "isReady" to the parent's event handler`,
+        );
+        expect(propAdvice).toContain('if it syncs with an external system, this effect may be justified');
       }
       if (rule.name === 'noInitializeState') {
         const hydration = diagnostics.find(
