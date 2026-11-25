@@ -529,6 +529,15 @@ pattern trigger_prop($component, $params, $body, $deps, $prop) {
   }
 }
 
+// Snippet variants avoid JsIfStatement(consequent = ...), which Biome 2.4.5 rejects.
+pattern if_else_branches($test, $then, $else) {
+  or {
+    `if ($test) { $then } else { $else }`,
+    `if ($test) $then else $else`,
+    `if ($test) { $then } else if ($_) { $else } else { $_ }`
+  }
+}
+
 `$setter($arg)` as $call where {
   $setter <: binding_name(),
   or {
@@ -581,6 +590,14 @@ pattern trigger_prop($component, $params, $body, $deps, $prop) {
         $arg <: contains and { JsReferenceIdentifier(),
         $state },
         $arg <: not contains state_reference($component, $body, $unused3)
+      },
+      $call <: not within if_else_branches($ifTest, $ifThen, $ifElse) where {
+        $ifThen <: contains `$setter($_)`,
+        $ifElse <: contains `$setter($_)`,
+        $ifTest <: contains or {
+          prop_reference($component, $body, $params, $unusedIfProp),
+          state_reference($component, $body, $unusedIfState)
+        }
       }
     }
   },
