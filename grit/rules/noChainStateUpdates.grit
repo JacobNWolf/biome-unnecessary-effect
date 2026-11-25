@@ -522,8 +522,8 @@ pattern enclosing_function($name, $params, $body) {
 `$setter($arg)` as $call where {
   $setter <: binding_name(),
   or {
-    $call <: within `$hook($cb, $deps)` where { $hook <: effect_hook() },
-    $call <: within `useCustomCompareEffect($cb, $deps, $comparator)`
+    $call <: within `$hook($cb, $deps)` as $effect where { $hook <: effect_hook() },
+    $call <: within `useCustomCompareEffect($cb, $deps, $comparator)` as $effect
   },
   $cb <: sync_callback($body),
   $body <: not syncs_with_browser(),
@@ -534,7 +534,31 @@ pattern enclosing_function($name, $params, $body) {
   $deps <: contains and { JsReferenceIdentifier(),
   binding_name() } as $dep where {
     $dep <: reads_state($component, $body, $source),
-    $source <: not $state
+    $source <: not $state,
+    not and {
+      // Snippet variants avoid JsIfStatement(test = ...), which Biome 2.4.5 cannot compile.
+      $call <: within or {
+        `if ($latchGuard) { $latchThen }`,
+        `if ($latchGuard) $latchThen`
+      } where { $latchGuard <: contains `!$source`, $call <: within $latchThen },
+      $component <: contains state_declaration($source, $latchSetter, $uInit) where {
+        $body <: contains `$latchSetter(true)` until function_node(),
+        $component <: not contains and { JsReferenceIdentifier(),
+        $latchSetter } as $otherLatchUse where { $otherLatchUse <: not within $effect }
+      } until declaration_boundary()
+    },
+    not and {
+      $call <: within or {
+        `if (!$dep) { $guardThen }`,
+        `if (!$dep) $guardThen`
+      } where { $call <: within $guardThen },
+      $arg <: contains identifier_reference() as $argRef where {
+        $argRef <: not reads_state($component, $body),
+        $argRef <: not invoked_in($body),
+        $deps <: contains and { JsReferenceIdentifier(),
+        $argRef }
+      }
+    }
   } until JsCallExpression(),
   $body <: not contains side_effect_call($component) until function_node(),
   $arg <: not contains state_reference($component, $body, $unused2),

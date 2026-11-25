@@ -291,7 +291,7 @@ function ProfilePage({ userId }) {
 }
 ```
 
-Render the component with `key={userId}`. React then resets all its state when `userId` changes. [Learn more](https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes)
+Render the component with `key={userId}`. React then resets all its state when `userId` changes. When the resets are guarded by a visibility prop such as `isOpen`, `open`, or `visible`, the diagnostic instead recommends conditional mounting (`{isOpen && <Form />}`) or resetting in the open handler (and still suggests `key={id}` when an identifying prop is also in the dependency array). [Learn more](https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes)
 
 ### `noPassDataToParent`
 
@@ -398,6 +398,7 @@ The GritQL rules match names, not bindings, and follow data through one local va
 - A setter called inside a renamed effect hook counts as a write outside effects, so `noDerivedState` skips that state.
 - Only `noPassLiveStateToParent` and `noPassDataToParent` follow props destructured after the signature.
 - **They can report shadowed names.** A local `const error` in an effect counts as the state variable `error`.
+- **`noChainStateUpdates` skips two guard patterns:** one-shot boolean latch flags written only as `setFlag(true)` inside the same `if (!flag ...)` effect, and negated boolean guards (`if (!isFocused)`) whose setter argument reads a non-state, non-callable dependency from the effect's dependency array.
 
 `noInitializeState` doesn't report an effect with no dependency array. `noSetStateInEffectWithoutDeps` reports it.
 

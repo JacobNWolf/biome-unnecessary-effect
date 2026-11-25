@@ -162,6 +162,31 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         expect(generic?.message).toContain('a key that identifies the item');
         expect(generic?.message).not.toContain('key={data}');
         expect(diagnostics.some(({ message }) => message.includes('key={userId}'))).toBe(true);
+        const modalAt = (line: number) =>
+          diagnostics.find(
+            ({ location }) => location.path.endsWith('modalOpenAdvice.tsx') && location.start.line === line,
+          )?.message;
+        expect(modalAt(12)).toContain('when "isOpen" changes');
+        expect(modalAt(12)).toContain('{isOpen && <Form />}');
+        expect(modalAt(12)).toContain('preserving-and-resetting-state');
+        expect(modalAt(12)).not.toContain('key={');
+        expect(modalAt(34)).toContain('when "open" changes');
+        expect(modalAt(34)).toContain('{open && <Form />}');
+        expect(modalAt(34)).toContain('key={itemId}');
+        expect(modalAt(45)).toContain('when "isModalOpen" changes');
+        expect(modalAt(45)).toContain('{isModalOpen && <Form />}');
+        expect(modalAt(45)).toContain('key={userId}');
+        expect(modalAt(58)).toContain('when "props.isOpen" changes');
+        expect(modalAt(58)).toContain('{props.isOpen && <Form />}');
+        expect(modalAt(69)).toContain('when "visible" changes');
+        expect(modalAt(83)).toContain('when "isVisible" changes');
+        expect(modalAt(94)).toContain('when "show" changes');
+        expect(modalAt(105)).toContain('when "isShown" changes');
+        expect(modalAt(116)).toContain('when "opened" changes');
+        expect(modalAt(127)).toContain('key={userId}');
+        expect(modalAt(127)).not.toContain('when "isOpen" changes');
+        expect(modalAt(140)).toContain('key={tabId}');
+        expect(modalAt(140)).not.toContain('when "isActive" changes');
       }
       if (rule.name === 'noInitializeState') {
         const hydration = diagnostics.find(
