@@ -3,7 +3,7 @@
   "upstreamCommit": "ff0e4a0d8a9acf4a08b4f24f32417eb16dfb3f5d",
   "caught": {
     "recommended": {
-      "no-adjust-state-on-prop-change": 7,
+      "no-adjust-state-on-prop-change": 6,
       "no-chain-state-updates": 4,
       "no-derived-state": 53,
       "no-event-handler": 7,
@@ -14,7 +14,7 @@
       "no-reset-all-state-on-prop-change": 6
     },
     "deep": {
-      "no-adjust-state-on-prop-change": 7,
+      "no-adjust-state-on-prop-change": 6,
       "no-chain-state-updates": 4,
       "no-derived-state": 65,
       "no-event-handler": 7,

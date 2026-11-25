@@ -161,11 +161,12 @@ pattern binding_name() {
   not r"(?:true|false|null|undefined|this)" }
 }
 
-// Excludes property names (JsName); callees bind JsIdentifierExpression, references bind JsReferenceIdentifier.
+// Excludes property names (JsName); callees bind JsIdentifierExpression, references bind JsReferenceIdentifier, JSX components bind JsxReferenceIdentifier.
 pattern identifier_reference() {
   and { or {
     JsReferenceIdentifier(),
-    JsIdentifierExpression()
+    JsIdentifierExpression(),
+    JsxReferenceIdentifier()
   },
   binding_name() }
 }
@@ -518,6 +519,16 @@ pattern enclosing_function($name, $params, $body) {
 }
 // prelude:end
 
+// Checks $deps before scanning the component or effect body so non-dependency identifiers fail fast.
+pattern trigger_prop($component, $params, $body, $deps, $prop) {
+  JsReferenceIdentifier() as $prop where {
+    $deps <: contains and { JsReferenceIdentifier(),
+    $prop },
+    $prop <: prop_or_context($component, $params, $prop),
+    $prop <: not invoked_in($body)
+  }
+}
+
 // Snippet variants avoid JsIfStatement(consequent = ...), which Biome 2.4.5 rejects.
 pattern if_else_branches($test, $then, $else) {
   or {
@@ -538,20 +549,35 @@ pattern if_else_branches($test, $then, $else) {
   $call <: direct_in_body($body),
   $call <: within enclosing_function($unused1, $params, $component),
   $setter <: state_setter($component, $state, $setter, $original),
-  $deps <: contains prop_or_context($component, $params, $dependencyProp),
+  $deps <: contains prop_or_context($component, $params, $dependencyProp) where {
+    $dependencyProp <: not invoked_in($body)
+  },
+  // Avoids JsIfStatement(consequent = ...), which Biome 2.4.5 cannot compile.
+  $call <: not within JsElseClause() as $elseClause where {
+    $elseClause <: within JsIfStatement() as $ifStmt where {
+      $elseClause <: not within JsIfStatement() as $midIf where { $midIf <: not $ifStmt, $midIf <: within $ifStmt },
+      $ifStmt <: contains `$setter($_)` as $earlierCall where {
+        $earlierCall <: not within $elseClause,
+        $earlierCall <: direct_in_body($body)
+      }
+    }
+  },
   or {
-    $arg <: contains prop_or_context($component, $params, $prop),
+    $arg <: contains trigger_prop($component, $params, $body, $deps, $prop),
     and {
-      $arg <: not contains prop_or_context($component, $params, $unusedArgProp),
-      $call <: within `if ($test) { $_ }`,
-      $test <: contains prop_or_context($component, $params, $prop)
-    },
-    and {
-      $arg <: not contains prop_or_context($component, $params, $unusedArgProp),
-      $call <: not within `if ($guard) { $_ }` where {
-        $guard <: contains prop_or_context($component, $params, $unusedGuardProp)
-      },
-      $deps <: contains prop_or_context($component, $params, $prop)
+      $arg <: not contains trigger_prop($component, $params, $body, $deps, $unusedArgProp),
+      or {
+        and {
+          $call <: within `if ($test) { $_ }`,
+          $test <: contains trigger_prop($component, $params, $body, $deps, $prop)
+        },
+        and {
+          $call <: not within `if ($guard) { $_ }` where {
+            $guard <: contains trigger_prop($component, $params, $body, $deps, $unusedGuardProp)
+          },
+          $prop = $dependencyProp
+        }
+      }
     }
   },
   or {
@@ -559,6 +585,12 @@ pattern if_else_branches($test, $then, $else) {
     and { $original <: not $setter, $component <: written_outside_effects($original, $setter) },
     and {
       $arg <: not contains prop_reference($component, $body, $params, $unused2),
+      or {
+        $arg <: not contains JsReferenceIdentifier(),
+        $arg <: contains and { JsReferenceIdentifier(),
+        $state },
+        $arg <: not contains state_reference($component, $body, $unused3)
+      },
       $call <: not within if_else_branches($ifTest, $ifThen, $ifElse) where {
         $ifThen <: contains `$setter($_)`,
         $ifElse <: contains `$setter($_)`,
@@ -568,6 +600,32 @@ pattern if_else_branches($test, $then, $else) {
         }
       }
     }
+  },
+  $body <: not contains or {
+    `$_.then($cb1)` where {
+      $cb1 <: contains and { JsReferenceIdentifier(),
+      $setter }
+    },
+    `$_.then($cb1, $cb2)` where {
+      or {
+        $cb1 <: contains and { JsReferenceIdentifier(),
+        $setter },
+        $cb2 <: contains and { JsReferenceIdentifier(),
+        $setter }
+      }
+    },
+    `$_.catch($cb1)` where {
+      $cb1 <: contains and { JsReferenceIdentifier(),
+      $setter }
+    },
+    `$_.finally($cb1)` where {
+      $cb1 <: contains and { JsReferenceIdentifier(),
+      $setter }
+    },
+    `async () => $aBody` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
+    `async ($_) => $aBody` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
+    `async function () { $aBody }` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
+    `async function ($_) { $aBody }` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` }
   },
   register_diagnostic(span=$call, message=`Avoid adjusting state when a prop changes. Adjust "$state" during render when "$prop" changes, or restructure state so it isn't needed. See https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes`, severity="warn")
 }

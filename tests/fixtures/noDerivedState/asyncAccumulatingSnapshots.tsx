@@ -221,7 +221,7 @@ export function EditableIfElseLiteral({ status }: { status: string }) {
     if (status === 'active') {
       setIconColor('blue'); // expect: noAdjustStateOnPropChange
     } else {
-      setIconColor('gray'); // expect: noAdjustStateOnPropChange
+      setIconColor('gray');
     }
   }, [status]);
 
