@@ -54,7 +54,7 @@ export function ChainWithStateOnlyHelper() {
 
   useEffect(() => {
     if (step > 3) {
-      resetMsg();
+      resetMsg(); // expect: noChainStateUpdates
       setDone(true); // expect: noChainStateUpdates
     }
   }, [step]);

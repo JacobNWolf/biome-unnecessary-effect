@@ -769,6 +769,7 @@ pattern state_only_helper($component) {
       `const $helper = ($...) => $hBody`,
       `function $helper($...) { $hBody }`
     } where {
+      $hBody <: not syncs_with_browser(),
       $hBody <: contains `$s($_)` where { $s <: state_setter($component, $uState, $s) },
       $hBody <: not contains JsCallExpression() as $innerCall where {
         $innerCall <: not pure_call(),
@@ -811,8 +812,11 @@ pattern enclosing_function($name, $params, $body) {
 }
 // prelude:end
 
-`$setter($arg)` as $call where {
-  $setter <: binding_name(),
+or {
+  `$callee($...)`,
+  `$callee?.($...)`
+} as $call where {
+  $callee <: binding_name(),
   or {
     $call <: within `$hook($cb, $deps)` as $effect where { $hook <: effect_hook() },
     $call <: within `useCustomCompareEffect($cb, $deps, $comparator)` as $effect
@@ -822,7 +826,58 @@ pattern enclosing_function($name, $params, $body) {
   $call <: direct_in_body($body),
   $body <: not contains cleanup_return() until function_node(),
   $call <: within enclosing_function($unused1, $params, $component),
-  $setter <: state_setter($component, $state, $setter),
+  or {
+    and {
+      $call <: `$callee($arg)`,
+      $callee <: state_setter($component, $state, $callee),
+      $updateBody = $body,
+      $updateOwner = $effect
+    },
+    and {
+      $call <: state_only_helper($component),
+      $component <: contains or {
+        `const $callee = ($hParams) => $hBody`,
+        `function $callee($hParams) { $hBody }`
+      } as $helper where {
+        $helper <: not or {
+          `const $callee = async ($...) => $asyncBody`,
+          `async function $callee($...) { $asyncBody }`
+        },
+        $updateBody = $hBody,
+        $updateOwner = $helper,
+        // Keep candidate checks inside contains so a rejected setter does not hide later ones.
+        $hBody <: contains `$s($arg)` where {
+          $s <: state_setter($component, $state, $s),
+          $arg <: not contains state_reference($component, $hBody, $unused4),
+          not and {
+            $hParams <: contains JsIdentifierBinding() as $parameter where {
+              or {
+                $arg <: contains and { identifier_reference(),
+                $parameter },
+                $hBody <: contains or {
+                  `const $parameterAlias = $parameterValue`,
+                  `function $parameterAlias() { $parameterValue }`
+                } where {
+                  $parameterValue <: contains and { identifier_reference(),
+                  $parameter },
+                  $arg <: contains and { identifier_reference(),
+                  $parameterAlias }
+                } until declaration_boundary()
+              }
+            },
+            $call <: contains JsCallArguments() as $helperArgs where {
+              $helperArgs <: contains state_reference($component, $body, $unused5)
+            }
+          },
+          $deps <: contains and { JsReferenceIdentifier(),
+          binding_name() } as $helperDep where {
+            $helperDep <: reads_state($component, $body, $helperSource),
+            $helperSource <: not $state
+          } until JsCallExpression()
+        } until function_node()
+      } until declaration_boundary()
+    }
+  },
   $deps <: contains and { JsReferenceIdentifier(),
   binding_name() } as $dep where {
     $dep <: reads_state($component, $body, $source),
@@ -834,9 +889,15 @@ pattern enclosing_function($name, $params, $body) {
         `if ($latchGuard) $latchThen`
       } where { $latchGuard <: contains `!$source`, $call <: within $latchThen },
       $component <: contains state_declaration($source, $latchSetter, $uInit) where {
-        $body <: contains `$latchSetter(true)` until function_node(),
+        or {
+          $body <: contains `$latchSetter(true)` until function_node(),
+          $updateBody <: contains `$latchSetter(true)` until function_node()
+        },
         $component <: not contains and { JsReferenceIdentifier(),
-        $latchSetter } as $otherLatchUse where { $otherLatchUse <: not within $effect }
+        $latchSetter } as $otherLatchUse where {
+          $otherLatchUse <: not within $effect,
+          $otherLatchUse <: not within $updateOwner
+        }
       } until declaration_boundary()
     },
     not and {
