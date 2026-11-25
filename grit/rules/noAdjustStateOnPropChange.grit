@@ -518,6 +518,16 @@ pattern enclosing_function($name, $params, $body) {
 }
 // prelude:end
 
+// Checks $deps before scanning the component or effect body so non-dependency identifiers fail fast.
+pattern trigger_prop($component, $params, $body, $deps, $prop) {
+  JsReferenceIdentifier() as $prop where {
+    $deps <: contains and { JsReferenceIdentifier(),
+    $prop },
+    $prop <: prop_or_context($component, $params, $prop),
+    $prop <: not invoked_in($body)
+  }
+}
+
 `$setter($arg)` as $call where {
   $setter <: binding_name(),
   or {
@@ -526,66 +536,62 @@ pattern enclosing_function($name, $params, $body) {
   },
   $cb <: sync_callback($body),
   $body <: not syncs_with_browser(),
-  $body <: not async_or_fetch_effect(),
   $call <: direct_in_body($body),
   $call <: within enclosing_function($unused1, $params, $component),
   $setter <: state_setter($component, $state, $setter, $original),
+  $body <: not contains or {
+    `$_.then($cb1)` where {
+      $cb1 <: contains and { JsReferenceIdentifier(),
+      $setter }
+    },
+    `$_.then($cb1, $cb2)` where {
+      or {
+        $cb1 <: contains and { JsReferenceIdentifier(),
+        $setter },
+        $cb2 <: contains and { JsReferenceIdentifier(),
+        $setter }
+      }
+    },
+    `$_.catch($cb1)` where {
+      $cb1 <: contains and { JsReferenceIdentifier(),
+      $setter }
+    },
+    `$_.finally($cb1)` where {
+      $cb1 <: contains and { JsReferenceIdentifier(),
+      $setter }
+    },
+    `async () => $aBody` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
+    `async ($_) => $aBody` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
+    `async function () { $aBody }` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
+    `async function ($_) { $aBody }` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` }
+  },
   $deps <: contains prop_or_context($component, $params, $dependencyProp) where {
     $dependencyProp <: not invoked_in($body)
   },
   // Avoids JsIfStatement(consequent = ...), which Biome 2.4.5 cannot compile.
   $call <: not within JsElseClause() as $elseClause where {
     $elseClause <: within JsIfStatement() as $ifStmt where {
-      $ifStmt <: contains `$setter($_)` as $earlierCall where { $earlierCall <: not within $elseClause }
+      $elseClause <: not within JsIfStatement() as $midIf where { $midIf <: not $ifStmt, $midIf <: within $ifStmt },
+      $ifStmt <: contains `$setter($_)` as $earlierCall where {
+        $earlierCall <: not within $elseClause,
+        $earlierCall <: direct_in_body($body)
+      }
     }
   },
   or {
-    $arg <: contains prop_or_context($component, $params, $prop) where {
-      $prop <: not invoked_in($body),
-      $deps <: contains and { JsReferenceIdentifier(),
-      $prop }
-    },
+    $arg <: contains trigger_prop($component, $params, $body, $deps, $prop),
     and {
-      $arg <: not contains prop_or_context($component, $params, $unusedArgProp) where {
-        $unusedArgProp <: not invoked_in($body),
-        $deps <: contains and { JsReferenceIdentifier(),
-        $unusedArgProp }
-      },
-      $call <: within `if ($test) { $_ }`,
-      $test <: contains prop_or_context($component, $params, $prop) where {
-        $prop <: not invoked_in($body),
-        $deps <: contains and { JsReferenceIdentifier(),
-        $prop },
-        not and {
-          $prop <: r"^(?:open|isOpen|enabled|isEnabled|visible|isVisible|show|isShown)$",
-          $arg <: or {
-            contains identifier_reference(),
-            contains function_node()
-          }
-        }
-      }
-    },
-    and {
-      $arg <: not contains prop_or_context($component, $params, $unusedArgProp2) where {
-        $unusedArgProp2 <: not invoked_in($body),
-        $deps <: contains and { JsReferenceIdentifier(),
-        $unusedArgProp2 }
-      },
-      $call <: not within `if ($guard) { $_ }` where {
-        $guard <: contains prop_or_context($component, $params, $unusedGuardProp) where {
-          $unusedGuardProp <: not invoked_in($body),
-          $deps <: contains and { JsReferenceIdentifier(),
-          $unusedGuardProp }
-        }
-      },
-      $deps <: contains prop_or_context($component, $params, $prop) where {
-        $prop <: not invoked_in($body),
-        not and {
-          $prop <: r"^(?:open|isOpen|enabled|isEnabled|visible|isVisible|show|isShown|editor|provider)$",
-          $arg <: or {
-            contains identifier_reference(),
-            contains function_node()
-          }
+      $arg <: not contains trigger_prop($component, $params, $body, $deps, $unusedArgProp),
+      or {
+        and {
+          $call <: within `if ($test) { $_ }`,
+          $test <: contains trigger_prop($component, $params, $body, $deps, $prop)
+        },
+        and {
+          $call <: not within `if ($guard) { $_ }` where {
+            $guard <: contains trigger_prop($component, $params, $body, $deps, $unusedGuardProp)
+          },
+          $prop = $dependencyProp
         }
       }
     }
@@ -595,7 +601,11 @@ pattern enclosing_function($name, $params, $body) {
     and { $original <: not $setter, $component <: written_outside_effects($original, $setter) },
     and {
       $arg <: not contains prop_reference($component, $body, $params, $unused2),
-      $arg <: not contains state_reference($component, $body, $unused3)
+      or {
+        $arg <: not contains state_reference($component, $body, $unused3),
+        $arg <: contains and { JsReferenceIdentifier(),
+        $state }
+      }
     }
   },
   register_diagnostic(span=$call, message=`Avoid adjusting state when a prop changes. Adjust "$state" during render when "$prop" changes, or restructure state so it isn't needed. See https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes`, severity="warn")

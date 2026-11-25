@@ -127,15 +127,28 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         expect(memberCollision?.message).not.toContain('when "title" changes');
         const nonDepProp = diagnostics.find(
           ({ location }) =>
-            location.path.endsWith('noAdjustStateOnPropChange/falsePositives.tsx') && location.start.line === 19,
+            location.path.endsWith('noAdjustStateOnPropChange/dependencyProps.tsx') && location.start.line === 18,
         );
         expect(nonDepProp?.message).toContain('when "fetched" changes');
         expect(nonDepProp?.message).not.toContain('when "likes" changes');
-        const literalResetOnOpen = diagnostics.find(
+        const nonDepGuard = diagnostics.find(
           ({ location }) =>
-            location.path.endsWith('noAdjustStateOnPropChange/falsePositives.tsx') && location.start.line === 119,
+            location.path.endsWith('noAdjustStateOnPropChange/dependencyProps.tsx') && location.start.line === 38,
         );
-        expect(literalResetOnOpen?.message).toContain('when "isOpen" changes');
+        expect(nonDepGuard?.message).toContain('when "userId" changes');
+        expect(nonDepGuard?.message).not.toContain('when "nonDepFlag" changes');
+        const nonDepArgFallback = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/dependencyProps.tsx') && location.start.line === 43,
+        );
+        expect(nonDepArgFallback?.message).toContain('when "userId" changes');
+        expect(nonDepArgFallback?.message).not.toContain('when "nonDepTitle" changes');
+        const invokedFormatter = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/dependencyProps.tsx') && location.start.line === 123,
+        );
+        expect(invokedFormatter?.message).toContain('when "value" changes');
+        expect(invokedFormatter?.message).not.toContain('when "format" changes');
       }
       if (rule.name === 'noChainStateUpdates') {
         const chain = diagnostics.find(
