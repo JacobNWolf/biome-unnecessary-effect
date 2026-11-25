@@ -34,3 +34,11 @@ export function useNestedIdenticalCall({ attemptAt }: { attemptAt: string | null
   }, [attemptAt]);
   return remaining + Number(isRateLimited);
 }
+
+export function JsxComponentProp({ Icon }: { Icon: () => JSX.Element }) {
+  const [node, setNode] = useState<JSX.Element | null>(null);
+  useEffect(() => {
+    setNode(<Icon />); // expect: noDerivedState
+  }, [Icon]);
+  return node;
+}
