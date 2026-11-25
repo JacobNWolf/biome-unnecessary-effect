@@ -216,6 +216,16 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
           ({ location }) => location.path.endsWith('noEventHandler/falsePositives.tsx') && location.start.line === 191,
         );
         expect(preferredBlock?.message).toContain('depends on "query"');
+        const aliasedDeps = (line: number) =>
+          diagnostics.find(
+            ({ location }) =>
+              location.path.endsWith('noEventHandler/aliasedDepsAndNestedGuards.tsx') && location.start.line === line,
+          );
+        expect(aliasedDeps(27)?.message).toContain('depends on "draft"');
+        expect(aliasedDeps(27)?.message).not.toContain('depends on "shouldSubmit"');
+        expect(aliasedDeps(40)?.message).toContain('depends on "hasChanges"');
+        expect(aliasedDeps(79)?.message).toContain('depends on "open"');
+        expect(aliasedDeps(79)?.message).not.toContain('depends on "cookieDays"');
       }
       if (rule.name === 'noInitializeState') {
         const hydration = diagnostics.find(

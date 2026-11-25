@@ -818,6 +818,8 @@ pattern event_guard($body, $component, $params, $deps, $test, $message) {
     `if ($test) $then` where { $then <: not JsBlockStatement(), $then <: not `return;` }
   } as $if where {
     $if <: not contains JsElseClause() until JsBlockStatement(),
+    // `within` also matches $if itself.
+    $if <: not within JsIfStatement() as $outerIf where { $outerIf <: not $if, $outerIf <: within $body },
     $test <: not contains or {
       `location.$_`,
       or {
@@ -871,15 +873,17 @@ pattern event_guard($body, $component, $params, $deps, $test, $message) {
     },
     or {
       and {
-        $test <: contains state_source_reference($component, $body, $ref) where {
+        $test <: contains state_reference_with_source($component, $body, $usedRef, $source) where {
           or {
             $deps <: `[]`,
             $deps <: contains and { JsReferenceIdentifier(),
-            $ref }
+            $usedRef },
+            $deps <: contains and { JsReferenceIdentifier(),
+            $source }
           },
-          $ref <: not effect_only_state($component, $body, $ref)
+          $source <: not effect_only_state($component, $body, $source)
         },
-        $message = `Avoid using state and an effect as an event handler. Run the code that depends on "$ref" from the event handler that sets it instead. See https://react.dev/learn/you-might-not-need-an-effect#sharing-logic-between-event-handlers`
+        $message = `Avoid using state and an effect as an event handler. Run the code that depends on "$source" from the event handler that sets it instead. See https://react.dev/learn/you-might-not-need-an-effect#sharing-logic-between-event-handlers`
       },
       and {
         $test <: contains prop_or_context($component, $params, $ref) where {
