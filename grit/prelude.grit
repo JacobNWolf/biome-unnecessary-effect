@@ -251,10 +251,10 @@ pattern state_source_reference($scope, $local, $source) {
   $ref where { $ref <: identifier_reference(), $ref <: reads_state($scope, $local, $source) }
 }
 
-pattern effect_only_state($scope, $source) {
+pattern effect_only_state($scope, $body, $source) {
   $source where {
     $scope <: contains state_declaration($source, $flagSetter, $unusedFlagInit) where {
-      $scope <: contains `$flagSetter($_)`,
+      $body <: contains `$flagSetter($_)`,
       $scope <: not written_outside_effects($flagSetter, $flagSetter)
     } until declaration_boundary()
   }
@@ -489,49 +489,59 @@ pattern async_or_fetch_effect() {
 }
 
 // Pure read/transform methods and constructors that are not external side effects.
+// Standalone expression statements stay side effects so calls like `router.replace()` or `api.get()` are not skipped.
 // Snippet and regex forms avoid JsCallExpression(callee = ...) and JsStaticMemberExpression(member = ...), which Biome 2.4.5 cannot compile.
 pattern pure_call() {
   or {
-    or {
-      `$_.$method($...)`,
-      `$_.$method()`
-    } where {
+    `$_.$method($...)` where {
       $method <: r"^(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
     },
-    and { JsCallExpression(),
-    r"^[A-Za-z0-9_$.?\[\]\s]+\?\.(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)\s*(?:\?\.)?\([\s\S]*\)$" },
     or {
-      `$fn($...)`,
-      `$fn()`
+      `$callee($...)`,
+      `$callee?.($...)`
     } where {
+      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
+    },
+    `$fn($...)` where {
       $fn <: r"^(?:Boolean|String|Number|BigInt|Array|Set|Map|parseInt|parseFloat|isNaN|isFinite|isEqual|encodeURIComponent|decodeURIComponent)$"
     },
-    or {
-      `$ns.$_($...)`,
-      `$ns.$_()`
-    } where { $ns <: r"^(?:Object|Array|Math|Number|JSON|Date)$" }
+    `Object.$method($...)` where {
+      $method <: r"^(?:keys|values|entries|fromEntries|is|hasOwn|getOwnPropertyNames|getOwnPropertyDescriptor|getPrototypeOf)$"
+    },
+    `$ns.$_($...)` where { $ns <: r"^(?:Array|Math|Number|JSON|Date)$" }
+  } as $pureCall where {
+    $pureCall <: not within JsExpressionStatement() as $stmt where {
+      $stmt <: or {
+        `$pureCall;`,
+        `$pureCall`
+      }
+    }
   }
 }
 
-// Same-component helper whose body only calls state setters, pure helpers, or local array .push().
+// Same-component helper whose body only calls state setters, pure helpers, or .push() on a helper-local array.
 pattern state_only_helper($component) {
   or {
     `$helper($...)`,
-    `$helper()`,
-    `$helper?.($...)`,
-    `$helper?.()`
+    `$helper?.($...)`
   } where {
     $helper <: identifier_reference(),
     $component <: contains or {
       `const $helper = ($...) => $hBody`,
-      `const $helper = () => $hBody`,
-      `function $helper($...) { $hBody }`,
-      `function $helper() { $hBody }`
+      `function $helper($...) { $hBody }`
     } where {
       $hBody <: contains `$s($_)` where { $s <: state_setter($component, $uState, $s) },
       $hBody <: not contains JsCallExpression() as $innerCall where {
         $innerCall <: not pure_call(),
-        $innerCall <: not `$_.push($...)`,
+        $innerCall <: not `$localArr.push($...)` where {
+          $localArr <: identifier_reference(),
+          $hBody <: contains or {
+            `const $localArr = $_`,
+            `const $localArr: $_ = $_`,
+            `let $localArr = $_`,
+            `let $localArr: $_ = $_`
+          } until function_node()
+        },
         $innerCall <: not `$s2($_)` where { $s2 <: state_setter($component, $u2, $s2) },
         $innerCall <: not within `$s2($_)` where { $s2 <: state_setter($component, $u2, $s2) }
       }

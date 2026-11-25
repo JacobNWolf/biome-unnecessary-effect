@@ -140,17 +140,17 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
       }
       if (rule.name === 'noEventHandler') {
         const alias = diagnostics.find(
-          ({ location }) => location.path.endsWith('noEventHandler/falsePositives.tsx') && location.start.line === 146,
+          ({ location }) => location.path.endsWith('noEventHandler/falsePositives.tsx') && location.start.line === 164,
         );
         expect(alias?.message).toContain('depends on "fieldErrors"');
         expect(alias?.message).not.toContain('depends on "staleIds"');
         const latchWithProp = diagnostics.find(
-          ({ location }) => location.path.endsWith('noEventHandler/falsePositives.tsx') && location.start.line === 87,
+          ({ location }) => location.path.endsWith('noEventHandler/falsePositives.tsx') && location.start.line === 105,
         );
         expect(latchWithProp?.message).toContain('depends on "isContentClipped"');
         expect(latchWithProp?.message).not.toContain('depends on "hasRevalidated"');
         const preferredBlock = diagnostics.find(
-          ({ location }) => location.path.endsWith('noEventHandler/falsePositives.tsx') && location.start.line === 173,
+          ({ location }) => location.path.endsWith('noEventHandler/falsePositives.tsx') && location.start.line === 191,
         );
         expect(preferredBlock?.message).toContain('depends on "query"');
       }
