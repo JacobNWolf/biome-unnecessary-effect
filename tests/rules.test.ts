@@ -188,6 +188,22 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         expect(modalAt(140)).toContain('key={tabId}');
         expect(modalAt(140)).not.toContain('when "isActive" changes');
       }
+      if (rule.name === 'noEventHandler') {
+        const alias = diagnostics.find(
+          ({ location }) => location.path.endsWith('noEventHandler/falsePositives.tsx') && location.start.line === 164,
+        );
+        expect(alias?.message).toContain('depends on "fieldErrors"');
+        expect(alias?.message).not.toContain('depends on "staleIds"');
+        const latchWithProp = diagnostics.find(
+          ({ location }) => location.path.endsWith('noEventHandler/falsePositives.tsx') && location.start.line === 105,
+        );
+        expect(latchWithProp?.message).toContain('depends on "isContentClipped"');
+        expect(latchWithProp?.message).not.toContain('depends on "hasRevalidated"');
+        const preferredBlock = diagnostics.find(
+          ({ location }) => location.path.endsWith('noEventHandler/falsePositives.tsx') && location.start.line === 191,
+        );
+        expect(preferredBlock?.message).toContain('depends on "query"');
+      }
       if (rule.name === 'noInitializeState') {
         const hydration = diagnostics.find(
           ({ location }) => location.path.endsWith('hydration.tsx') && location.start.line === 6,

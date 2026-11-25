@@ -398,13 +398,14 @@ The GritQL rules match names, not bindings, and follow data through one local va
 - A setter called inside a renamed effect hook counts as a write outside effects, so `noDerivedState` skips that state.
 - Only `noPassLiveStateToParent` and `noPassDataToParent` follow props destructured after the signature.
 - **They can report shadowed names.** A local `const error` in an effect counts as the state variable `error`.
+- **`noEventHandler` reports at most once per effect**, preferring a non-early-return `if` guard over an early-return bail-out guard.
 - **`noChainStateUpdates` skips two guard patterns:** one-shot boolean latch flags written only as `setFlag(true)` inside the same `if (!flag ...)` effect, and negated boolean guards (`if (!isFocused)`) whose setter argument reads a non-state, non-callable dependency from the effect's dependency array.
 
 `noInitializeState` doesn't report an effect with no dependency array. `noSetStateInEffectWithoutDeps` reports it.
 
 The `deep` preset handles the remaining setter aliases, wrapper setters, memo-wrapped components and namespace/default React aliases, but only for `noDerivedState`. The other rules still use GritQL.
 
-On the ESLint plugin's rule and util test cases (v1.2.0), the `recommended` preset finds 143 of 162 problems and the `deep` preset finds 156. `recommended` reports 4 of the 135 valid cases and `deep` reports 2; `flagged` in `scripts/eval-baseline.json` lists each one with the reason.
+On the ESLint plugin's rule and util test cases (v1.2.0), the `recommended` preset finds 123 of 162 problems and the `deep` preset finds 135. `recommended` reports 4 of the 135 valid cases and `deep` reports 3; `flagged` in `scripts/eval-baseline.json` lists each one with the reason.
 
 Biome runs each plugin on each file. On a 696-file React codebase, all the GritQL rules together add about 11 seconds to a lint run.
 
