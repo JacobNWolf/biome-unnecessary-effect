@@ -70,6 +70,8 @@ export function RisingEdgeWithId({ isFlowActive, itemId }: { isFlowActive: boole
     if (isFlowActive && !wasActiveRef.current) {
       setTitle('');
       setBody('');
+    } else {
+      setTitle('');
     }
     wasActiveRef.current = isFlowActive;
   }, [isFlowActive, itemId]);
@@ -88,6 +90,10 @@ export function RisingEdgeProps(props: { isFlowActive: boolean; initialValue: st
     if (props.isFlowActive && !wasActiveRef.current) {
       setValue(props.initialValue);
       setStep(0);
+    } else if (props.isFlowActive) {
+      setStep(1);
+    } else {
+      setStep(0);
     }
     wasActiveRef.current = props.isFlowActive;
   }, [props.isFlowActive, props.initialValue]);
@@ -96,4 +102,46 @@ export function RisingEdgeProps(props: { isFlowActive: boolean; initialValue: st
       {value}
     </button>
   );
+}
+
+export function BranchLocalTracking({ isFlowActive, itemId }: { isFlowActive: boolean; itemId: string }) {
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const wasActiveRef = useRef(false);
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    if (isFlowActive && !wasActiveRef.current) {
+      setTitle('');
+      setBody('');
+      wasActiveRef.current = isFlowActive;
+    }
+  }, [isFlowActive, itemId]);
+  return `${title}${body}`;
+}
+
+export function DisjunctiveGuard({ isFlowActive, itemId }: { isFlowActive: boolean; itemId: string }) {
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const wasActiveRef = useRef(false);
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    if (isFlowActive || !wasActiveRef.current) {
+      setTitle('');
+      setBody('');
+    }
+    wasActiveRef.current = isFlowActive;
+  }, [isFlowActive, itemId]);
+  return `${title}${body}`;
+}
+
+export function TrackingBeforeGuard({ isFlowActive, itemId }: { isFlowActive: boolean; itemId: string }) {
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const wasActiveRef = useRef(false);
+  useEffect(() => { // expect: noResetAllStateOnPropChange
+    wasActiveRef.current = isFlowActive;
+    if (isFlowActive && !wasActiveRef.current) {
+      setTitle('');
+      setBody('');
+    }
+  }, [isFlowActive, itemId]);
+  return `${title}${body}`;
 }

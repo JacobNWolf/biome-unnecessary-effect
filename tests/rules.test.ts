@@ -230,8 +230,13 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         }
         expect(risingEdgeAt(69)).toContain('when "isFlowActive" changes');
         expect(risingEdgeAt(69)).toContain('key={itemId}');
-        expect(risingEdgeAt(87)).toContain('when "props.isFlowActive" changes');
-        expect(risingEdgeAt(87)).toContain('{props.isFlowActive && <Form />}');
+        expect(risingEdgeAt(89)).toContain('when "props.isFlowActive" changes');
+        expect(risingEdgeAt(89)).toContain('{props.isFlowActive && <Form />}');
+        for (const line of [111, 125, 139]) {
+          expect(risingEdgeAt(line)).toContain('key={itemId}');
+          expect(risingEdgeAt(line)).not.toContain('when "isFlowActive" changes');
+          expect(risingEdgeAt(line)).not.toContain('<Form />');
+        }
       }
       if (rule.name === 'noEventHandler') {
         const alias = diagnostics.find(
