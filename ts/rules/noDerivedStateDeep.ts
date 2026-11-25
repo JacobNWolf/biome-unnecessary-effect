@@ -83,6 +83,33 @@ const isUpdaterArgument = (model: SemanticModel, call: JsCallExpression): boolea
   return isFunction(argument) || (!!updater && isFunction(functionOf(updater)));
 };
 
+const isStateReference = (model: SemanticModel, node: AnyJsAstNode | undefined, stateBinding: Binding): boolean => {
+  const value = unwrap(node);
+  return (
+    value?.kind === 'JS_IDENTIFIER_EXPRESSION' && !!value.name && sameBinding(model.binding(value.name), stateBinding)
+  );
+};
+
+const comparesStateToArg = (
+  model: SemanticModel,
+  node: AnyJsAstNode,
+  stateBinding: Binding,
+  arg: AnyJsAstNode | undefined,
+): boolean => {
+  if (!arg) return false;
+  if (node.kind === 'JS_BINARY_EXPRESSION' && (node.operatorToken === '!==' || node.operatorToken === '!=')) {
+    const left = unwrap(node.left);
+    const right = unwrap(node.right);
+    const argText = arg.text.trim();
+    if (
+      (isStateReference(model, left, stateBinding) && right?.text.trim() === argText) ||
+      (isStateReference(model, right, stateBinding) && left?.text.trim() === argText)
+    )
+      return true;
+  }
+  return node.children().some((child) => comparesStateToArg(model, child, stateBinding, arg));
+};
+
 const hasAccumulatingOrSelfGuardedWrite = (
   model: SemanticModel,
   calls: JsCallExpression[],
@@ -94,11 +121,13 @@ const hasAccumulatingOrSelfGuardedWrite = (
     const reads = call.arguments ? upstream(model, call.arguments) : [];
     if (reads.some((source) => source.kind === 'state' && source.name === state)) return true;
     if (stateBinding) {
+      const arg = unwrap(call.arguments?.args[0]);
       for (const ancestor of call.ancestors()) {
         if (
           ancestor.kind === 'JS_IF_STATEMENT' &&
           ancestor.test &&
-          containsReferenceTo(model, ancestor.test, stateBinding)
+          containsReferenceTo(model, ancestor.test, stateBinding) &&
+          !comparesStateToArg(model, ancestor.test, stateBinding, arg)
         )
           return true;
       }
@@ -109,17 +138,23 @@ const hasAccumulatingOrSelfGuardedWrite = (
 const isBareIfInitializedSnapshot = (
   model: SemanticModel,
   node: AnyJsAstNode,
+  arg: AnyJsAstNode | undefined,
   callback: AnyJsAstNode,
   stateInit: AnyJsAstNode | undefined,
 ): boolean => {
-  if (!stateInit) return false;
+  if (!stateInit || !arg) return false;
   for (const ancestor of node.ancestors()) {
     if (sameNode(ancestor, callback)) break;
     if (ancestor.kind !== 'JS_IF_STATEMENT' || ancestor.elseClause) continue;
     const test = unwrap(ancestor.test);
     if (test?.kind !== 'JS_IDENTIFIER_EXPRESSION' || !test.name) continue;
     const testBinding = model.binding(test.name);
-    if (testBinding && containsReferenceTo(model, stateInit, testBinding)) return true;
+    if (!testBinding || !containsReferenceTo(model, stateInit, testBinding)) continue;
+    const matchesArg =
+      (arg.kind === 'JS_IDENTIFIER_EXPRESSION' && !!arg.name && sameBinding(model.binding(arg.name), testBinding)) ||
+      ((arg.kind === 'JS_OBJECT_EXPRESSION' || arg.kind === 'JS_ARRAY_EXPRESSION') &&
+        containsReferenceTo(model, arg, testBinding));
+    if (matchesArg) return true;
   }
   return false;
 };
@@ -154,7 +189,10 @@ export const noDerivedStateDeep = defineRule({
       const declaration = stateDeclarationOf(model, setter.binding);
       const allSetterCalls = setterCalls(model, setter.binding);
       if (hasAccumulatingOrSelfGuardedWrite(model, allSetterCalls, setter.state, declaration?.stateBinding)) continue;
-      if (isBareIfInitializedSnapshot(model, origin, effect.callback, declaration?.init)) continue;
+      if (
+        isBareIfInitializedSnapshot(model, origin, unwrap(call.arguments?.args[0]), effect.callback, declaration?.init)
+      )
+        continue;
 
       const reads = call.arguments ? upstream(model, call.arguments) : [];
       if (reads.some((source) => source.kind === 'state' && source.name === setter.state)) continue;
@@ -167,28 +205,35 @@ export const noDerivedStateDeep = defineRule({
           if (sameNode(ancestor, effect.callback)) break;
           ancestors.push(ancestor);
         }
-        if (!ancestors.some((ancestor) => ancestor.kind === 'JS_ELSE_CLAUSE')) {
-          derived = ancestors.some((ancestor) => {
-            if (
-              ancestor.kind !== 'JS_IF_STATEMENT' ||
-              !ancestor.test ||
-              !ancestor.consequent ||
-              !ancestor.elseClause?.alternate
-            )
-              return false;
-            const testReads = upstream(model, ancestor.test);
-            if (testReads.some((source) => source.kind === 'external')) return false;
-            if (!testReads.some((source) => source.kind === 'state' || source.kind === 'prop')) return false;
-            const consequent = ancestor.consequent;
-            const alternate = ancestor.elseClause.alternate;
-            const writesIn = (branch: AnyJsAstNode) =>
-              calls.some(
-                (other) =>
-                  isWithin(other.origin, branch) && sameBinding(setterOfCall(other.call)?.binding, setter.binding),
-              );
-            return writesIn(consequent) && writesIn(alternate);
-          });
-        }
+        const writesIn = (branch: AnyJsAstNode) =>
+          calls.some(
+            (other) => isWithin(other.origin, branch) && sameBinding(setterOfCall(other.call)?.binding, setter.binding),
+          );
+        derived = ancestors.some((ancestor, index) => {
+          if (
+            ancestor.kind !== 'JS_IF_STATEMENT' ||
+            !ancestor.test ||
+            !ancestor.consequent ||
+            !ancestor.elseClause?.alternate
+          )
+            return false;
+          if (!isWithin(origin, ancestor.consequent)) return false;
+          const shadowedByOuterElseIf = ancestors
+            .slice(index + 1)
+            .some(
+              (outer) =>
+                outer.kind === 'JS_IF_STATEMENT' &&
+                !!outer.consequent &&
+                !!outer.elseClause &&
+                isWithin(ancestor, outer.elseClause) &&
+                writesIn(outer.consequent),
+            );
+          if (shadowedByOuterElseIf) return false;
+          const testReads = upstream(model, ancestor.test);
+          if (testReads.some((source) => source.kind === 'external')) return false;
+          if (!testReads.some((source) => source.kind === 'state' || source.kind === 'prop')) return false;
+          return writesIn(ancestor.consequent) && writesIn(ancestor.elseClause.alternate);
+        });
       }
       if (!derived) continue;
 

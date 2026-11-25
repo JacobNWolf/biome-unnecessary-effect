@@ -21,13 +21,19 @@ export function Search({ query }: { query: string }) {
     return () => clearInterval(id);
   }, [query]);
 
-  // A local function that shadows the setter's name isn't a setter; the earlier await write also disqualifies result.
+  return result + label;
+}
+
+export function ShadowedSetter({ query }: { query: string }) {
+  const [result, setResult] = useState('');
+
+  // A local function that shadows the setter's name isn't a setter. GritQL matches by name, so it misreports this.
   useEffect(() => {
     const setResult = (value: string) => console.log(value);
-    setResult(query);
+    setResult(query); // expect: noDerivedState
   }, [query]);
 
-  return result + label;
+  return result;
 }
 
 export const Errors = ({ url }: { url: string }) => {

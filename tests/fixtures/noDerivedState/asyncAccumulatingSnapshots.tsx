@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 declare function fetchMore(): Promise<{ posts: string[] }>;
+declare function log(): void;
 
 export function AccumulatingAcrossEffects({
   initialPosts,
@@ -12,9 +13,7 @@ export function AccumulatingAcrossEffects({
   const [posts, setPosts] = useState<string[]>(initialPosts);
 
   useEffect(() => {
-    if (posts) {
-      setPosts(initialPosts);
-    }
+    setPosts(initialPosts);
   }, [initialPosts]);
 
   useEffect(() => {
@@ -38,6 +37,29 @@ export function AccumulatingUpdaterAcrossEffects({ initial, next }: { initial: s
   }, [next]);
 
   return items;
+}
+
+export function AliasedAsyncAndAccumulating({ initial, next }: { initial: string[]; next: string }) {
+  const [posts, setPosts] = useState<string[]>(initial);
+  const [items, setItems] = useState<string[]>(initial);
+
+  useEffect(() => {
+    setPosts(initial);
+  }, [initial]);
+  useEffect(() => {
+    const updatePosts = setPosts;
+    fetchMore().then((res) => updatePosts(res.posts));
+  }, []);
+
+  useEffect(() => {
+    setItems(initial);
+  }, [initial]);
+  useEffect(() => {
+    const updateItems = setItems;
+    updateItems((prev) => [...prev, next]);
+  }, [next]);
+
+  return [posts, items];
 }
 
 export function AsyncWritesAcrossEffects({ initial }: { initial: string[] }) {
@@ -89,21 +111,31 @@ export function AsyncWritesAcrossEffects({ initial }: { initial: string[] }) {
   return [thenPosts, catchErr, finallyDone, awaitedPosts, timedPosts];
 }
 
-export function PreviousValueSnapshot({ color }: { color: string }) {
-  const [mounted, setMounted] = useState(false);
-  const [initialColor, setInitialColor] = useState(color);
+export function DefaultOnceGuard({ items }: { items: string[] }) {
+  const [selected, setSelected] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    setMounted(true); // expect: noInitializeState
-  }, []);
-
-  useEffect(() => {
-    if (mounted && initialColor && color !== initialColor) {
-      setInitialColor(color);
+    if (!selected) {
+      setSelected(items[0]);
     }
-  }, [mounted, initialColor, color]);
+  }, [items, selected]);
 
-  return initialColor;
+  return selected;
+}
+
+export function GuardedDerivedState({ items, first, last }: { items: string[]; first: string; last: string }) {
+  const [count, setCount] = useState(0);
+  const [fullName, setFullName] = useState('');
+
+  useEffect(() => {
+    if (count !== items.length) setCount(items.length); // expect: noDerivedState, noDerivedStateDeep
+  }, [items]);
+
+  useEffect(() => {
+    if (fullName !== first + ' ' + last) setFullName(first + ' ' + last); // expect: noDerivedState, noDerivedStateDeep
+  }, [first, last]);
+
+  return [count, fullName];
 }
 
 export function InitializedBareIfSnapshot({ postId, hashCommentId }: { postId: string; hashCommentId?: string }) {
@@ -118,6 +150,16 @@ export function InitializedBareIfSnapshot({ postId, hashCommentId }: { postId: s
   return savedTarget;
 }
 
+export function BareIfComputedDerived({ first, last }: { first: string; last: string }) {
+  const [fullName, setFullName] = useState(first + ' ' + last);
+
+  useEffect(() => {
+    if (first) setFullName(first + ' ' + last); // expect: noDerivedState, noDerivedStateDeep
+  }, [first, last]);
+
+  return fullName;
+}
+
 export function IfElseLiteralDerived({ status }: { status: string }) {
   const [iconColor, setIconColor] = useState('gray');
 
@@ -130,6 +172,46 @@ export function IfElseLiteralDerived({ status }: { status: string }) {
   }, [status]);
 
   return iconColor;
+}
+
+export function NestedIfElseInsideOuterElse({ on, status }: { on: boolean; status: string }) {
+  const [color, setColor] = useState('gray');
+
+  useEffect(() => {
+    if (!on) {
+      log();
+    } else {
+      if (status === 'a') {
+        setColor('blue'); // expect: noDerivedState, noDerivedStateDeep
+      } else {
+        setColor('gray');
+      }
+    }
+  }, [on, status]);
+
+  return color;
+}
+
+export function UnbracedAndElseIfLiteral({ status }: { status: string }) {
+  const [shortColor, setShortColor] = useState('gray');
+  const [tierColor, setTierColor] = useState('gray');
+
+  useEffect(() => {
+    if (status === 'active') setShortColor('blue'); // expect: noDerivedState, noDerivedStateDeep
+    else setShortColor('gray');
+  }, [status]);
+
+  useEffect(() => {
+    if (status === 'a') {
+      setTierColor('blue'); // expect: noDerivedState, noDerivedStateDeep
+    } else if (status === 'b') {
+      setTierColor('green');
+    } else {
+      setTierColor('gray');
+    }
+  }, [status]);
+
+  return [shortColor, tierColor];
 }
 
 export function EditableIfElseLiteral({ status }: { status: string }) {

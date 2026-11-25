@@ -544,7 +544,12 @@ pattern async_or_accumulating_write($component, $target, $state) {
         `window.setTimeout($...)`,
         `window.setInterval($...)`
       },
-      $otherArg <: reads_state($component, $component, $state),
+      $otherArg <: or {
+        and { identifier_reference(),
+        $state },
+        contains and { JsReferenceIdentifier(),
+        $state }
+      },
       $otherArg <: contains function_node() until or {
         JsCallExpression(),
         JsNewExpression(),
@@ -559,11 +564,17 @@ pattern async_or_accumulating_write($component, $target, $state) {
 pattern if_with_test($test) {
   or {
     `if ($test) { $_ }`,
-    `if ($test) { $_ } else { $_ }`,
-    `if ($test) { $_ } else $_`,
     `if ($test) $_`,
-    `if ($test) $_ else { $_ }`,
-    `if ($test) $_ else $_`
+    `if ($test) { $_ } else { $_ }`
+  }
+}
+
+// Snippet variants avoid JsIfStatement(consequent = ...), which Biome 2.4.5 rejects.
+pattern if_else_branches($test, $then, $else) {
+  or {
+    `if ($test) { $then } else { $else }`,
+    `if ($test) $then else $else`,
+    `if ($test) { $then } else if ($_) { $else } else { $_ }`
   }
 }
 
@@ -600,24 +611,28 @@ pattern if_with_test($test) {
     }
   } },
   $arg <: not reads_state($component, $body, $state),
-  $component <: not contains if_with_test($selfTest) as $selfGuard where {
-    $selfGuard <: contains or {
-      `$setter($_)`,
-      `$original($_)`
+  or {
+    $arg <: contains or {
+      state_reference($component, $body, $unused2),
+      prop_reference($component, $body, $params, $unused3)
     },
-    $selfTest <: contains and { JsReferenceIdentifier(),
-    $state }
-  },
-  $call <: not within or {
-    `if ($memTest) { $_ }`,
-    `if ($memTest) $_`
-  } as $memIf where {
-    $memIf <: not contains JsElseClause() until JsBlockStatement(),
-    $memTest <: identifier_reference(),
-    $component <: contains state_declaration($state, $original, $stateInit) where {
-      $stateInit <: contains and { JsReferenceIdentifier(),
-      $memTest }
-    } until declaration_boundary()
+    and {
+      $call <: within JsIfStatement(),
+      $call <: within if_else_branches($ifTest, $ifThen, $ifElse) as $ifElseStmt where {
+        $call <: within $ifThen,
+        $ifElseStmt <: not within JsElseClause() as $parentElse where {
+          $parentElse <: within if_else_branches($unusedOuterTest, $outerThen, $unusedOuterElse) where {
+            $outerThen <: contains `$setter($_)`
+          }
+        },
+        $ifThen <: contains `$setter($_)`,
+        $ifElse <: contains `$setter($_)`,
+        $ifTest <: contains or {
+          state_reference($component, $body, $unused4),
+          prop_reference($component, $body, $params, $unused5)
+        }
+      }
+    }
   },
   $component <: not written_outside_effects($setter, $original),
   $component <: not async_or_accumulating_write($component, $setter, $state),
@@ -629,22 +644,47 @@ pattern if_with_test($test) {
       $component <: not async_or_accumulating_write($component, $original, $state)
     }
   },
-  or {
-    $arg <: contains or {
-      state_reference($component, $body, $unused2),
-      prop_reference($component, $body, $params, $unused3)
+  $component <: not contains `const $alias = $original` where {
+    $alias <: binding_name(),
+    $component <: async_or_accumulating_write($component, $alias, $state)
+  },
+  $component <: not contains if_with_test($selfTest) as $selfGuard where {
+    $selfGuard <: contains or {
+      `$setter($guardArg)`,
+      `$original($guardArg)`
     },
-    and {
-      $call <: not within JsElseClause(),
-      $call <: within `if ($ifTest) { $ifThen } else { $ifElse }` where {
-        $ifThen <: contains `$setter($_)`,
-        $ifElse <: contains `$setter($_)`,
-        $ifTest <: contains or {
-          state_reference($component, $body, $unused4),
-          prop_reference($component, $body, $params, $unused5)
-        }
-      }
+    $selfTest <: contains and { JsReferenceIdentifier(),
+    $state },
+    $selfTest <: not contains or {
+      `$state !== $guardArg`,
+      `$guardArg !== $state`,
+      `$state != $guardArg`,
+      `$guardArg != $state`
     }
+  },
+  $call <: not within or {
+    `if ($memTest) { $_ }`,
+    `if ($memTest) $_`
+  } as $memIf where {
+    $memIf <: not contains JsElseClause() until JsBlockStatement(),
+    $memTest <: identifier_reference(),
+    or {
+      and { $arg <: identifier_reference(), $arg <: $memTest },
+      and {
+        $arg <: JsObjectExpression(),
+        $arg <: contains and { JsReferenceIdentifier(),
+        $memTest }
+      },
+      and {
+        $arg <: JsArrayExpression(),
+        $arg <: contains and { JsReferenceIdentifier(),
+        $memTest }
+      }
+    },
+    $component <: contains state_declaration($state, $original, $stateInit) where {
+      $stateInit <: contains and { JsReferenceIdentifier(),
+      $memTest }
+    } until declaration_boundary()
   },
   register_diagnostic(span=$call, message=`Avoid storing derived state. Compute "$state" directly during render instead. See https://react.dev/learn/you-might-not-need-an-effect#updating-state-based-on-props-or-state`, severity="warn")
 }

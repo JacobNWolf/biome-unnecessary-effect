@@ -518,6 +518,15 @@ pattern enclosing_function($name, $params, $body) {
 }
 // prelude:end
 
+// Snippet variants avoid JsIfStatement(consequent = ...), which Biome 2.4.5 rejects.
+pattern if_else_branches($test, $then, $else) {
+  or {
+    `if ($test) { $then } else { $else }`,
+    `if ($test) $then else $else`,
+    `if ($test) { $then } else if ($_) { $else } else { $_ }`
+  }
+}
+
 `$setter($arg)` as $call where {
   $setter <: binding_name(),
   or {
@@ -550,7 +559,7 @@ pattern enclosing_function($name, $params, $body) {
     and { $original <: not $setter, $component <: written_outside_effects($original, $setter) },
     and {
       $arg <: not contains prop_reference($component, $body, $params, $unused2),
-      $call <: not within `if ($ifTest) { $ifThen } else { $ifElse }` where {
+      $call <: not within if_else_branches($ifTest, $ifThen, $ifElse) where {
         $ifThen <: contains `$setter($_)`,
         $ifElse <: contains `$setter($_)`,
         $ifTest <: contains or {
