@@ -533,7 +533,27 @@ pattern enclosing_function($name, $params, $body) {
   $deps <: contains and { JsReferenceIdentifier(),
   binding_name() } as $dep where {
     $dep <: reads_state($component, $body, $source),
-    $source <: not $state
+    $source <: not $state,
+    not and {
+      $source <: effect_only_state($component, $source),
+      $component <: contains state_declaration($source, $latchSetter, $uInit) where {
+        $body <: contains `$latchSetter($latchVal)` where {
+          $latchVal <: JsBooleanLiteralExpression()
+        } until function_node()
+      } until declaration_boundary()
+    },
+    not and {
+      // Snippet variants avoid JsIfStatement(test = ...), which Biome 2.4.5 cannot compile.
+      $call <: within or {
+        `if (!$dep) { $_ }`,
+        `if (!$dep) $_`
+      },
+      $arg <: contains identifier_reference() as $argRef where {
+        $argRef <: not reads_state($component, $body),
+        $deps <: contains and { JsReferenceIdentifier(),
+        $argRef }
+      }
+    }
   } until JsCallExpression(),
   $body <: not contains side_effect_call($component) until function_node(),
   $arg <: not contains state_reference($component, $body, $unused2),

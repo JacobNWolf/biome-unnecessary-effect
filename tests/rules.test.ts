@@ -137,6 +137,24 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         expect(generic?.message).toContain('a key that identifies the item');
         expect(generic?.message).not.toContain('key={data}');
         expect(diagnostics.some(({ message }) => message.includes('key={userId}'))).toBe(true);
+        const scheduleModal = diagnostics.find(
+          ({ location }) => location.path.endsWith('modalOpenAdvice.tsx') && location.start.line === 12,
+        );
+        expect(scheduleModal?.message).toContain('when "isOpen" changes');
+        expect(scheduleModal?.message).toContain('{isOpen && <Form />}');
+        expect(scheduleModal?.message).not.toContain('key={');
+        const earlyReturnModal = diagnostics.find(
+          ({ location }) => location.path.endsWith('modalOpenAdvice.tsx') && location.start.line === 34,
+        );
+        expect(earlyReturnModal?.message).toContain('when "open" changes');
+        expect(earlyReturnModal?.message).toContain('{open && <Form />}');
+        expect(earlyReturnModal?.message).not.toContain('key={itemId}');
+        const bracedReturnModal = diagnostics.find(
+          ({ location }) => location.path.endsWith('modalOpenAdvice.tsx') && location.start.line === 45,
+        );
+        expect(bracedReturnModal?.message).toContain('when "isFlowActive" changes');
+        expect(bracedReturnModal?.message).toContain('{isFlowActive && <Form />}');
+        expect(bracedReturnModal?.message).not.toContain('key={userId}');
       }
       if (rule.name === 'noInitializeState') {
         const hydration = diagnostics.find(

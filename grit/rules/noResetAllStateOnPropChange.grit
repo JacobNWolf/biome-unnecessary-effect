@@ -518,6 +518,18 @@ pattern enclosing_function($name, $params, $body) {
 }
 // prelude:end
 
+pattern open_guard($component, $params, $openProp) {
+  or {
+    `if ($guard) return;`,
+    `if ($guard) { return; }`,
+    `if ($guard) { $_ }`
+  } where {
+    $guard <: contains prop_or_context($component, $params, $openProp) where {
+      $openProp <: r"^(?:open|isOpen|visible|isVisible|show|isShown|isActive|isFlowActive)$"
+    }
+  }
+}
+
 `$hook($cb, $deps)` as $effect where {
   $hook <: effect_hook(),
   $cb <: sync_callback($body),
@@ -553,16 +565,27 @@ pattern enclosing_function($name, $params, $body) {
       } until function_node()
     } until function_node()
   },
-  $deps <: contains prop_or_context($component, $params, $prop),
-  $prop <: not r"(?:is|has|should|show|can)(?:[A-Z_][A-Za-z0-9_]*|$)",
+  $deps <: contains prop_or_context($component, $params, $prop) where {
+    $prop <: not r"(?:is|has|should|show|can)(?:[A-Z_][A-Za-z0-9_]*|$)"
+  },
   or {
     and {
-      $prop <: r"(?:id|key|slug|uuid|[A-Za-z_$][A-Za-z0-9_$]*(?:Id|Key))",
-      $keyAdvice = `If "$prop" identifies the item, render this component with key={$prop} so React resets its state.`
+      $body <: contains open_guard($component, $params, $openProp) until function_node(),
+      $message = `Avoid resetting all state in an effect when "$openProp" changes. Render the stateful form only while "$openProp" is true (for example, {$openProp && <Form />}), or reset the state in the event handler that opens it. If a transition wrapper must stay mounted to animate closing, move the form state into an inner component. See https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes`
     },
     and {
-      $prop <: not r"(?:id|key|slug|uuid|[A-Za-z_$][A-Za-z0-9_$]*(?:Id|Key))",
-      $keyAdvice = `Render this component with a key that identifies the item, such as its id, so React resets its state.`
+      $body <: not contains open_guard($component, $params, $unusedOpenProp) until function_node(),
+      or {
+        and {
+          $prop <: r"(?:id|key|slug|uuid|[A-Za-z_$][A-Za-z0-9_$]*(?:Id|Key))",
+          $keyAdvice = `If "$prop" identifies the item, render this component with key={$prop} so React resets its state.`
+        },
+        and {
+          $prop <: not r"(?:id|key|slug|uuid|[A-Za-z_$][A-Za-z0-9_$]*(?:Id|Key))",
+          $keyAdvice = `Render this component with a key that identifies the item, such as its id, so React resets its state.`
+        }
+      },
+      $message = `Avoid resetting all state when a prop changes. $keyAdvice If the state is a draft the user is editing, adjust it during render instead, because a new key remounts the inputs. See https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes`
     }
   },
   // `useState()` starts as undefined, so `setX()` and `setX(undefined)` both reset it.
@@ -613,5 +636,5 @@ pattern enclosing_function($name, $params, $body) {
       } until function_node()
     }
   } until declaration_boundary(),
-  register_diagnostic(span=$effect, message=`Avoid resetting all state when a prop changes. $keyAdvice If the state is a draft the user is editing, adjust it during render instead, because a new key remounts the inputs. See https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes`, severity="warn")
+  register_diagnostic(span=$effect, message=$message, severity="warn")
 }
