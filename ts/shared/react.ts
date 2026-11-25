@@ -180,20 +180,57 @@ const classify = (model: SemanticModel, binding: Binding): Source | undefined =>
   return undefined;
 };
 
-const references = (node: AnyJsAstNode, skipCallArguments = false): AnyJsIdentifierReference[] => {
-  if (node.kind === 'JS_REFERENCE_IDENTIFIER') return [node];
-  if (skipCallArguments && node.kind === 'JS_CALL_ARGUMENTS') return [];
-  return node.children().flatMap((child) => references(child, skipCallArguments));
+const hookResult = (model: SemanticModel, node: AnyJsAstNode | undefined, seen = new Set<string>()): boolean => {
+  const value = unwrap(node);
+  if (value?.kind === 'JS_CALL_EXPRESSION') return hookCallee(model, value.callee, seen);
+  if (value?.kind === 'JS_STATIC_MEMBER_EXPRESSION') return hookResult(model, value.object, seen);
+  if (value?.kind !== 'JS_IDENTIFIER_EXPRESSION' || !value.name) return false;
+  const binding = model.binding(value.name);
+  if (!binding) return false;
+  const key = nodeKey(binding.syntax());
+  if (seen.has(key)) return false;
+  seen.add(key);
+  return hookResult(model, initializerOf(binding)?.init, seen);
 };
 
-/**
- * Like the ESLint plugin, tracing doesn't follow arguments passed to calls in initializers:
- * `useQuery({ id })` returns external data, not something derived from `id`.
- */
-export const upstream = (model: SemanticModel, node: AnyJsAstNode, constAliasesOnly = false): Source[] => {
+const hookCallee = (model: SemanticModel, node: AnyJsAstNode | undefined, seen = new Set<string>()): boolean => {
+  const callee = unwrap(node);
+  if (callee?.kind === 'JS_IDENTIFIER_EXPRESSION')
+    return /^use[A-Z]/.test(importOf(model, callee)?.name ?? callee.text) || hookResult(model, callee, seen);
+  return (
+    callee?.kind === 'JS_STATIC_MEMBER_EXPRESSION' &&
+    (/^use[A-Z]/.test(callee.member?.text ?? '') || hookResult(model, callee.object, seen))
+  );
+};
+
+const references = (
+  model: SemanticModel,
+  node: AnyJsAstNode,
+  skipHookArguments = false,
+  stopAtFunctions = false,
+): AnyJsIdentifierReference[] => {
+  if (stopAtFunctions && isFunction(node)) return [];
+  if (node.kind === 'JS_REFERENCE_IDENTIFIER') return [node];
+  if (
+    skipHookArguments &&
+    node.kind === 'JS_CALL_ARGUMENTS' &&
+    node.parent?.kind === 'JS_CALL_EXPRESSION' &&
+    hookCallee(model, node.parent.callee)
+  )
+    return [];
+  return node.children().flatMap((child) => references(model, child, skipHookArguments, stopAtFunctions));
+};
+
+// Hook initializers return external data; ordinary function arguments can still be derived inputs.
+export const upstream = (
+  model: SemanticModel,
+  node: AnyJsAstNode,
+  constAliasesOnly = false,
+  stopAtFunctions = false,
+): Source[] => {
   const seen = new Set<string>();
   const trace = (node: AnyJsAstNode, skipCallArguments = false): Source[] =>
-    references(node, skipCallArguments).flatMap((reference) => {
+    references(model, node, skipCallArguments, stopAtFunctions).flatMap((reference) => {
       const binding = model.binding(reference);
       if (!binding && BROWSER_GLOBALS.has(reference.text)) return [{ kind: 'external' }];
       const key = binding && nodeKey(binding.syntax());
@@ -202,7 +239,10 @@ export const upstream = (model: SemanticModel, node: AnyJsAstNode, constAliasesO
       const source = classify(model, binding);
       if (source) return [source];
       const fn = functionOf(binding);
-      if (fn) return isAsync(fn) ? [] : trace(fn, true);
+      if (fn) {
+        const body = bodyOf(fn);
+        return isAsync(fn) || !body ? [] : trace(body, true);
+      }
       const declaration = initializerOf(binding);
       const parent = declaration?.declarator.parent?.parent;
       // A `let` setter alias may be reassigned before the call.
@@ -250,13 +290,34 @@ const usedOnlyInEffects = (model: SemanticModel, binding: Binding, seen = new Se
   seen.add(key);
 
   return binding.allReferences().every((reference) => {
+    const functions: AnyJsAstNode[] = [];
+    const expression = reference.syntax().parent;
+    if (expression?.kind === 'JS_IDENTIFIER_EXPRESSION' && expression.parent?.kind === 'JS_CALL_ARGUMENT_LIST') {
+      const call = expression.parent.parent?.parent;
+      if (!call || !isEffectCall(model, call)) return false;
+    }
     for (const ancestor of reference.syntax().ancestors()) {
-      if (isEffectCall(model, ancestor)) return true;
+      if (isFunction(ancestor)) functions.push(ancestor);
+      if (isEffectCall(model, ancestor) && ancestor.kind === 'JS_CALL_EXPRESSION') {
+        const first = unwrap(ancestor.arguments?.args[0]);
+        const local = first?.kind === 'JS_IDENTIFIER_EXPRESSION' && first.name ? model.binding(first.name) : undefined;
+        const callback = local ? functionOf(local) : first;
+        return !!callback && !hasCleanup(callback) && functions.every((fn) => nodeKey(fn) === nodeKey(callback));
+      }
 
       if (ancestor.kind === 'JS_VARIABLE_DECLARATOR' || ancestor.kind === 'JS_FUNCTION_DECLARATION') {
         const id = ancestor.id;
 
         if (id?.kind !== 'JS_IDENTIFIER_BINDING' || COMPONENT_OR_HOOK.test(id.text)) return false;
+
+        if (ancestor.kind === 'JS_FUNCTION_DECLARATION') {
+          if (isAsync(ancestor) || !functions.every((fn) => nodeKey(fn) === nodeKey(ancestor))) return false;
+        } else {
+          const init = unwrap(ancestor.initializer?.expression);
+          const isAlias = functions.length === 0 && init?.kind === 'JS_IDENTIFIER_EXPRESSION';
+          const isHelper = isFunction(init) && !isAsync(init) && functions.every((fn) => nodeKey(fn) === nodeKey(init));
+          if (!isAlias && !isHelper) return false;
+        }
 
         const local = model.asBinding(id);
 
@@ -356,5 +417,5 @@ export const syncsWithBrowser = (model: SemanticModel, fn: AnyJsAstNode): boolea
     return node.children().some(visit);
   };
   const body = bodyOf(fn);
-  return !!body && (visit(body) || upstream(model, body).some((source) => source.kind === 'external'));
+  return !!body && (visit(body) || upstream(model, body, false, true).some((source) => source.kind === 'external'));
 };
