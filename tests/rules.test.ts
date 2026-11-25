@@ -8,6 +8,7 @@ const RULES_DIR = join(ROOT, 'grit', 'rules');
 const TS_RULES_DIR = join(ROOT, 'ts', 'rules');
 const FIXTURES_DIR = join(import.meta.dir, 'fixtures');
 const BIOME_BIN = join(ROOT, 'node_modules', '.bin', 'biome');
+const LINT_TIMEOUT_MS = 60_000;
 const BIOME_VERSION: string = JSON.parse(
   readFileSync(join(ROOT, 'node_modules', '@biomejs', 'biome', 'package.json'), 'utf8'),
 ).version;
@@ -48,7 +49,7 @@ type Diagnostic = { category: string; message: string; location: { path: string;
 const lint = (rulePath: string) => {
   const configDir = mkdtempSync(join(tmpdir(), 'bue-rule-'));
   writeFileSync(join(configDir, 'biome.json'), JSON.stringify({ plugins: [rulePath] }));
-  const { stdout, stderr } = Bun.spawnSync(
+  const { stdout, stderr, exitedDueToTimeout } = Bun.spawnSync(
     [
       BIOME_BIN,
       'lint',
@@ -57,8 +58,11 @@ const lint = (rulePath: string) => {
       `--config-path=${configDir}`,
       ...fixtures.map(({ file }) => file),
     ],
-    { cwd: FIXTURES_DIR },
+    { cwd: FIXTURES_DIR, timeout: LINT_TIMEOUT_MS },
   );
+  if (exitedDueToTimeout) {
+    throw new Error(`Biome ${BIOME_VERSION} timed out after ${LINT_TIMEOUT_MS}ms linting ${rulePath}.`);
+  }
   const text = stdout.toString();
 
   if (!text.trim()) {
@@ -109,7 +113,7 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
   }, 15_000);
 
   for (const rule of rules) {
-    // Linting the full fixture corpus per rule can exceed Bun's 5s default on slower CI runners.
+    // Full-corpus runs on the oldest supported Biome need extra time on shared CI runners.
     test(rule.name, () => {
       const diagnostics = lint(rule.path);
       const actual = diagnostics.map(({ location }) => `${location.path}:${location.start.line}`).sort();
@@ -224,6 +228,6 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         );
         expect(ordinary?.message).toContain('Pass this value');
       }
-    }, 15_000);
+    }, 65_000);
   }
 });
