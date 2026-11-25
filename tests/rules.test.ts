@@ -154,6 +154,16 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         );
         expect(invokedFormatter?.message).toContain('when "value" changes');
         expect(invokedFormatter?.message).not.toContain('when "format" changes');
+        const triggerAt = (line: number) =>
+          diagnostics.find(
+            ({ location }) =>
+              location.path.endsWith('noAdjustStateOnPropChange/triggerAndDeferral.tsx') &&
+              location.start.line === line,
+          )?.message;
+        expect(triggerAt(151)).toContain('when "src" changes');
+        expect(triggerAt(151)).not.toContain('when "editor" changes');
+        expect(triggerAt(188)).toContain('when "initialName" changes');
+        expect(triggerAt(200)).toContain('when "isOpen" changes');
       }
       if (rule.name === 'noChainStateUpdates') {
         const chain = diagnostics.find(
