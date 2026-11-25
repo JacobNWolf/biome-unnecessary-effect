@@ -105,6 +105,25 @@ export function AssertedControllerHookDestructuredNotDerived({ id }: { id: strin
   return canReset;
 }
 
+export function StackedAssertionControllerHookNotDerived({ id }: { id: string }) {
+  const [canReset, setCanReset] = useState(false);
+  const [canSubmit, setCanSubmit] = useState(false);
+  const [canSave, setCanSave] = useState(false);
+  const { reset } = (useForm({ defaultValues: { id } }) as unknown) as { reset: () => void };
+  const { reset: resetNonNull } = useForm({ defaultValues: { id } })!;
+  const { reset: resetSatisfies } = useForm({ defaultValues: { id } }) as { reset: () => void } satisfies {
+    reset: () => void;
+  };
+
+  useEffect(() => {
+    setCanReset(Boolean(reset));
+    setCanSubmit(Boolean(resetNonNull));
+    setCanSave(Boolean(resetSatisfies));
+  }, [reset, resetNonNull, resetSatisfies]);
+
+  return canReset && canSubmit && canSave;
+}
+
 export function CustomContextDoesNotSuppressChain() {
   const mode = useModeContext();
   const [step, setStep] = useState(0);

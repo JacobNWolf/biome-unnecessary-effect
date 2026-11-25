@@ -300,7 +300,10 @@ const usedOnlyInEffects = (model: SemanticModel, binding: Binding, seen = new Se
     for (const ancestor of reference.syntax().ancestors()) {
       if (isFunction(ancestor)) functions.push(ancestor);
       if (ancestor.kind === 'JS_CALL_EXPRESSION' && reactHook(model, ancestor.callee) === 'useEffectEvent') {
-        return true;
+        const first = unwrap(ancestor.arguments?.args[0]);
+        const local = first?.kind === 'JS_IDENTIFIER_EXPRESSION' && first.name ? model.binding(first.name) : undefined;
+        const callback = local ? functionOf(local) : first;
+        return !!callback && !isAsync(callback) && functions.every((fn) => nodeKey(fn) === nodeKey(callback));
       }
       if (isEffectCall(model, ancestor) && ancestor.kind === 'JS_CALL_EXPRESSION') {
         const first = unwrap(ancestor.arguments?.args[0]);

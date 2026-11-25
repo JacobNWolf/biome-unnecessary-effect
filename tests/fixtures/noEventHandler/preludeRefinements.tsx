@@ -302,6 +302,26 @@ export function CopyArrayMethodsAndDestructuringReassign({
     }
   }, [active, patterns, url]);
 
+  useEffect(() => {
+    if (active) { // expect: noEventHandler
+      for (var validUrlRegex of patterns) {
+        void validUrlRegex;
+      }
+      if (validUrlRegex.test(url)) {
+        setMatched(true); // expect: noAdjustStateOnPropChange
+      }
+    }
+  }, [active, patterns, url]);
+
+  useEffect(() => {
+    const next: string[] = [];
+    void next;
+    if (active) { // expect: noEventHandler
+      const next = externalStore.items;
+      next.push('x');
+    }
+  }, [active]);
+
   return [items.length, matched];
 }
 

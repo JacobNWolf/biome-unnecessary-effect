@@ -185,20 +185,20 @@ pattern controller_hook() {
 }
 
 pattern external_hook_call() {
-  or {
+  contains or {
     `$hook($...)`,
     `$hook<$_>($...)`,
     `$hook()`,
-    `$hook<$_>()`,
-    `$hook($...) as $_`,
-    `$hook<$_>($...) as $_`,
-    `$hook() as $_`,
-    `$hook<$_>() as $_`,
-    `$hook($...) satisfies $_`,
-    `$hook<$_>($...) satisfies $_`,
-    `$hook() satisfies $_`,
-    `$hook<$_>() satisfies $_`
-  } where { $hook <: controller_hook() }
+    `$hook<$_>()`
+  } where { $hook <: controller_hook() } until or {
+    JsCallArguments(),
+    JsObjectExpression(),
+    JsArrayExpression(),
+    JsBinaryExpression(),
+    JsLogicalExpression(),
+    JsConditionalExpression(),
+    function_node()
+  }
 }
 
 // Tracing follows one hop through component/effect locals, excluding controller hooks and nested functions.
@@ -579,70 +579,59 @@ pattern stateless_regex_const($re) {
   } where { $lit <: stateless_regex_literal() }
 }
 
-pattern non_stateless_regex_decl($re) {
-  JsVariableDeclaration() as $reDecl where {
-    $reDecl <: contains and { JsIdentifierBinding(),
-    $re } until JsInitializerClause(),
-    $reDecl <: not stateless_regex_const($re)
-  }
-}
-
 pattern stateless_regex() {
   or {
     stateless_regex_literal(),
     `new RegExp($...)`,
     // Binding matches rebind $re; keep the use site for scope and shadowing checks.
+    // Match `$re` before `JsIdentifierBinding()` and skip initializers/expressions/returns so repeated `.test()` calls stay fast.
     $re as $reUse where {
       $re <: identifier_reference(),
       $reUse <: not within function_node() as $fn where {
-        $fn <: contains JsParameters() as $fnParams where {
-          $fnParams <: contains and { JsIdentifierBinding(),
-          $re } until JsInitializerClause()
-        } until JsFunctionBody()
-      },
-      $reUse <: not within or {
-        JsForInStatement(),
-        JsForOfStatement(),
-        JsForStatement()
-      } as $loop where {
-        $loop <: contains JsForVariableDeclaration() as $loopDecl where {
-          $loopDecl <: contains and { JsIdentifierBinding(),
-          $re } until JsInitializerClause()
-        } until JsBlockStatement()
-      },
-      $reUse <: not within or {
-        JsFunctionBody(),
-        JsBlockStatement()
-      } as $shadowScope where {
-        $shadowScope <: contains non_stateless_regex_decl($re) as $shadowDecl where {
-          $shadowDecl <: not within or {
-            function_node(),
-            JsBlockStatement()
-          } as $innerShadow where { $innerShadow <: not $shadowScope, $innerShadow <: within $shadowScope }
-        } until function_node()
+        $fn <: contains and { $re,
+        JsIdentifierBinding() } as $shadowBinding where {
+          $shadowBinding <: not within stateless_regex_const($re)
+        } until or {
+          JsInitializerClause(),
+          JsExpressionStatement(),
+          JsReturnStatement()
+        }
       },
       or {
-        $reUse <: within or {
-          JsFunctionBody(),
-          JsBlockStatement()
-        } as $reScope where {
-          $reScope <: contains stateless_regex_const($re) as $localReDecl where {
-            $localReDecl <: not within or {
-              function_node(),
-              JsBlockStatement()
-            } as $innerReScope where { $innerReScope <: not $reScope, $innerReScope <: within $reScope }
-          } until function_node()
-        },
         and {
-          $program <: contains stateless_regex_const($re) until or {
+          $program <: contains and { $re,
+          JsIdentifierBinding() } as $topReBinding where {
+            $topReBinding <: within stateless_regex_const($re)
+          } until or {
             function_node(),
             JsBlockStatement(),
             JsExpressionStatement()
           },
-          $program <: not contains non_stateless_regex_decl($re) until or {
+          $program <: not contains and { $re,
+          JsIdentifierBinding() } as $topShadowBinding where {
+            $topShadowBinding <: not within stateless_regex_const($re)
+          } until or {
             function_node(),
             JsBlockStatement(),
             JsExpressionStatement()
+          }
+        },
+        $reUse <: within or {
+          JsFunctionBody(),
+          JsBlockStatement()
+        } as $reScope where {
+          $reScope <: contains and { $re,
+          JsIdentifierBinding() } as $localReBinding where {
+            $localReBinding <: within stateless_regex_const($re),
+            $localReBinding <: not within or {
+              function_node(),
+              JsBlockStatement()
+            } as $innerReScope where { $innerReScope <: not $reScope, $innerReScope <: within $reScope }
+          } until or {
+            function_node(),
+            JsInitializerClause(),
+            JsExpressionStatement(),
+            JsReturnStatement()
           }
         }
       }
@@ -719,6 +708,18 @@ pattern local_array_push() {
       JsBlockStatement()
     } as $block where {
       $pushCall <: direct_in_body($block),
+      $pushCall <: not within or {
+        JsBlockStatement(),
+        JsCatchClause(),
+        JsForInStatement(),
+        JsForOfStatement(),
+        JsForStatement()
+      } as $shadowBlock where {
+        $shadowBlock <: not $block,
+        $shadowBlock <: within $block,
+        $shadowBlock <: contains and { JsIdentifierBinding(),
+        $localArr }
+      },
       or {
         $block <: contains or {
           `const $localArr = $arrInit`,
