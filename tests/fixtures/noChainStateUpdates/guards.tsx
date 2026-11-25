@@ -64,7 +64,7 @@ export function LatchOtherBranch() {
   const [flag, setFlag] = useState(false);
   const [label, setLabel] = useState('');
   useEffect(() => {
-    setFlag(count > 3); // expect: noDerivedState, noDerivedStateDeep
+    setFlag(count > 3); // expect: noDerivedState
   }, [count]);
   useEffect(() => {
     if (flag) setLabel('big'); // expect: noChainStateUpdates
@@ -164,7 +164,7 @@ export function ElseBranchExternal() {
   const [status, setStatus] = useState('');
   useEffect(() => {
     if (!isLocked) {
-      setStatus('open'); // expect: noChainStateUpdates
+      setStatus('open'); // expect: noChainStateUpdates, noDerivedState, noDerivedStateDeep
     } else {
       setStatus(emailMessage?.subject_line ?? ''); // expect: noChainStateUpdates
     }
