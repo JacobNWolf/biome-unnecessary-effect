@@ -210,7 +210,7 @@ function Form({ first, last }) {
 
 Compute the value during render: `` const fullName = `${first} ${last}` ``. [Learn more](https://react.dev/learn/you-might-not-need-an-effect#updating-state-based-on-props-or-state)
 
-State that is also set outside effects, such as an input draft the user edits, isn't derived, so this rule skips it. [`noAdjustStateOnPropChange`](#noadjuststateonpropchange) reports it when a prop changes it.
+State that is also set outside effects, such as an input draft the user edits, isn't derived, so this rule skips it. [`noAdjustStateOnPropChange`](#noadjuststateonpropchange) reports it when a prop changes it. Complete `if`/`else` chains that assign literals based on props or state are also reported here. State updated asynchronously (`.then`/`.catch`/`.finally`, `async`/`await`, timers), accumulated from its previous value across effects, or guarded as a one-time default/snapshot is skipped.
 
 ### `noChainStateUpdates`
 

@@ -109,6 +109,7 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
   }, 15_000);
 
   for (const rule of rules) {
+    // Linting the full fixture corpus per rule can exceed Bun's 5s default on slower CI runners.
     test(rule.name, () => {
       const diagnostics = lint(rule.path);
       const actual = diagnostics.map(({ location }) => `${location.path}:${location.start.line}`).sort();
@@ -125,6 +126,30 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         );
         expect(memberCollision?.message).toContain('when "currentPage" changes');
         expect(memberCollision?.message).not.toContain('when "title" changes');
+        const nonDepProp = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/dependencyProps.tsx') && location.start.line === 18,
+        );
+        expect(nonDepProp?.message).toContain('when "fetched" changes');
+        expect(nonDepProp?.message).not.toContain('when "likes" changes');
+        const nonDepGuard = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/dependencyProps.tsx') && location.start.line === 38,
+        );
+        expect(nonDepGuard?.message).toContain('when "userId" changes');
+        expect(nonDepGuard?.message).not.toContain('when "nonDepFlag" changes');
+        const nonDepArgFallback = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/dependencyProps.tsx') && location.start.line === 43,
+        );
+        expect(nonDepArgFallback?.message).toContain('when "userId" changes');
+        expect(nonDepArgFallback?.message).not.toContain('when "nonDepTitle" changes');
+        const invokedFormatter = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/dependencyProps.tsx') && location.start.line === 123,
+        );
+        expect(invokedFormatter?.message).toContain('when "value" changes');
+        expect(invokedFormatter?.message).not.toContain('when "format" changes');
       }
       if (rule.name === 'noChainStateUpdates') {
         const chain = diagnostics.find(
@@ -149,6 +174,6 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         );
         expect(ordinary?.message).toContain('Pass this value');
       }
-    });
+    }, 15_000);
   }
 });

@@ -48,7 +48,7 @@ const bodyOf = (fn: AnyJsAstNode): AnyJsAstNode | undefined => (isFunction(fn) ?
  * The plugin API returns a fresh wrapper object on every access and exposes no source ranges,
  * so nodes are identified by their kind and text plus the kinds and lengths of their ancestors.
  */
-const nodeKey = (node: AnyJsAstNode): string =>
+export const nodeKey = (node: AnyJsAstNode): string =>
   [node, ...node.ancestors()].map((part) => `${part.kind}:${part.text.length}`).join('/') + node.text;
 
 const WRAPPERS = [
