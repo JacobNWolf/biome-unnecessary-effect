@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 
 declare function useExternalEmbed(id: string): { data?: { preview?: string } };
 declare function usePageContext<T = { header: string }>(): { pageData: T };
-declare function useForm(options: { defaultValues: { id: string } }): { data: string };
+declare function useModeContext(): string;
+declare function useForm(options: { defaultValues: { id: string } }): { data: string; reset: () => void };
 declare const fallback: { preview?: string };
 
 export function DestructuredHookProp({ embedId }: { embedId: string }) {
@@ -91,4 +92,32 @@ export function ControllerHookDestructuredNotDerived({ id }: { id: string }) {
   }, [data]);
 
   return value;
+}
+
+export function AssertedControllerHookDestructuredNotDerived({ id }: { id: string }) {
+  const [canReset, setCanReset] = useState(false);
+  const { reset } = useForm({ defaultValues: { id } }) as { reset: () => void };
+
+  useEffect(() => {
+    setCanReset(Boolean(reset));
+  }, [reset]);
+
+  return canReset;
+}
+
+export function CustomContextDoesNotSuppressChain() {
+  const mode = useModeContext();
+  const [step, setStep] = useState(0);
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    void mode;
+    setCount(1); // expect: noChainStateUpdates
+  }, [step, mode]);
+
+  return (
+    <button type="button" onClick={() => setStep((s) => s + 1)}>
+      {count}
+    </button>
+  );
 }

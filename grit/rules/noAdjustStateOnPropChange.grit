@@ -191,7 +191,15 @@ pattern external_hook_call() {
     `$hook($...)`,
     `$hook<$_>($...)`,
     `$hook()`,
-    `$hook<$_>()`
+    `$hook<$_>()`,
+    `$hook($...) as $_`,
+    `$hook<$_>($...) as $_`,
+    `$hook() as $_`,
+    `$hook<$_>() as $_`,
+    `$hook($...) satisfies $_`,
+    `$hook<$_>($...) satisfies $_`,
+    `$hook() satisfies $_`,
+    `$hook<$_>() satisfies $_`
   } where { $hook <: controller_hook() }
 }
 
@@ -336,16 +344,26 @@ pattern parent_callback($scope, $params) {
   }
 }
 
-pattern context_hook_call() {
-  or {
-    `useContext($_)`,
-    `React.useContext($_)`,
-    or {
-      `$ctxHook($...)`,
-      `$ctxHook<$_>($...)`,
-      `$ctxHook()`,
-      `$ctxHook<$_>()`
-    } where { $ctxHook <: r"^use[A-Z][A-Za-z0-9_]*Context$" }
+pattern custom_context_reference($scope, $ref) {
+  $ref where {
+    $ref <: identifier_reference(),
+    $scope <: contains `const $binding = $context` where {
+      $context <: or {
+        `$ctxHook($...)`,
+        `$ctxHook<$_>($...)`,
+        `$ctxHook()`,
+        `$ctxHook<$_>()`
+      } where { $ctxHook <: r"^use[A-Z][A-Za-z0-9_]*Context$" },
+      $binding <: or {
+        $ref,
+        and { JsObjectBindingPattern(),
+        contains and { JsIdentifierBinding(),
+        $ref } until or {
+          JsInitializerClause(),
+          JsComputedMemberName()
+        } }
+      }
+    } until declaration_boundary()
   }
 }
 
@@ -357,7 +375,10 @@ pattern prop_reference($scope, $local, $params, $ref) {
       $params <: contains and { JsIdentifierBinding(),
       $ref } until JsInitializerClause(),
       $scope <: contains `const $binding = $context` where {
-        $context <: context_hook_call(),
+        $context <: or {
+          `useContext($_)`,
+          `React.useContext($_)`
+        },
         $binding <: or {
           $ref,
           and { JsObjectBindingPattern(),
@@ -560,24 +581,72 @@ pattern stateless_regex_const($re) {
   } where { $lit <: stateless_regex_literal() }
 }
 
+pattern non_stateless_regex_decl($re) {
+  JsVariableDeclaration() as $reDecl where {
+    $reDecl <: contains and { JsIdentifierBinding(),
+    $re } until JsInitializerClause(),
+    $reDecl <: not stateless_regex_const($re)
+  }
+}
+
 pattern stateless_regex() {
   or {
     stateless_regex_literal(),
     `new RegExp($...)`,
-    // Binding matches rebind $re; keep the use site for parameter-shadowing checks.
+    // Binding matches rebind $re; keep the use site for scope and shadowing checks.
     $re as $reUse where {
       $re <: identifier_reference(),
-      $program <: contains stateless_regex_const($re),
-      $program <: not contains JsVariableDeclaration() as $reDecl where {
-        $reDecl <: contains and { JsIdentifierBinding(),
-        $re } until JsInitializerClause(),
-        $reDecl <: not stateless_regex_const($re)
-      },
       $reUse <: not within function_node() as $fn where {
         $fn <: contains JsParameters() as $fnParams where {
           $fnParams <: contains and { JsIdentifierBinding(),
           $re } until JsInitializerClause()
         } until JsFunctionBody()
+      },
+      $reUse <: not within or {
+        JsForInStatement(),
+        JsForOfStatement(),
+        JsForStatement()
+      } as $loop where {
+        $loop <: contains JsForVariableDeclaration() as $loopDecl where {
+          $loopDecl <: contains and { JsIdentifierBinding(),
+          $re } until JsInitializerClause()
+        } until JsBlockStatement()
+      },
+      $reUse <: not within or {
+        JsFunctionBody(),
+        JsBlockStatement()
+      } as $shadowScope where {
+        $shadowScope <: contains non_stateless_regex_decl($re) as $shadowDecl where {
+          $shadowDecl <: not within or {
+            function_node(),
+            JsBlockStatement()
+          } as $innerShadow where { $innerShadow <: not $shadowScope, $innerShadow <: within $shadowScope }
+        } until function_node()
+      },
+      or {
+        $reUse <: within or {
+          JsFunctionBody(),
+          JsBlockStatement()
+        } as $reScope where {
+          $reScope <: contains stateless_regex_const($re) as $localReDecl where {
+            $localReDecl <: not within or {
+              function_node(),
+              JsBlockStatement()
+            } as $innerReScope where { $innerReScope <: not $reScope, $innerReScope <: within $reScope }
+          } until function_node()
+        },
+        and {
+          $program <: contains stateless_regex_const($re) until or {
+            function_node(),
+            JsBlockStatement(),
+            JsExpressionStatement()
+          },
+          $program <: not contains non_stateless_regex_decl($re) until or {
+            function_node(),
+            JsBlockStatement(),
+            JsExpressionStatement()
+          }
+        }
       }
     }
   }
@@ -589,14 +658,14 @@ pattern stateless_regex() {
 pattern pure_call() {
   or {
     `$_.$method($...)` where {
-      $method <: r"^(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
+      $method <: r"^(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd|toSorted|toReversed|toSpliced|with)$"
     },
     `$re.test($...)` where { $re <: stateless_regex() },
     or {
       `$callee($...)`,
       `$callee?.($...)`
     } where {
-      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
+      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd|toSorted|toReversed|toSpliced|with)$"
     },
     or {
       `$callee($...)`,
@@ -656,14 +725,32 @@ pattern local_array_push() {
         $block <: contains or {
           `const $localArr = $arrInit`,
           `const $localArr: $_ = $arrInit`
-        } where { $arrInit <: fresh_array() } until function_node(),
+        } as $constDecl where {
+          $arrInit <: fresh_array(),
+          $constDecl <: not within JsBlockStatement() as $innerConstBlock where {
+            $innerConstBlock <: not $block,
+            $innerConstBlock <: within $block
+          }
+        } until function_node(),
         and {
           $block <: contains or {
             `let $localArr = $arrInit`,
             `let $localArr: $_ = $arrInit`
-          } where { $arrInit <: fresh_array() } until function_node(),
-          // Node form also covers `??=`/`||=`/`+=`, whose snippets Biome cannot compile.
-          $block <: not contains JsAssignmentExpression(left=$localArr)
+          } as $letDecl where {
+            $arrInit <: fresh_array(),
+            $letDecl <: not within JsBlockStatement() as $innerLetBlock where {
+              $innerLetBlock <: not $block,
+              $innerLetBlock <: within $block
+            }
+          } until function_node(),
+          // Node form also covers `??=`/`||=`/`+=` and destructuring targets (`[a] = ...`, `({ a } = ...)`).
+          $block <: not contains JsAssignmentExpression(left=$lhs) where {
+            $lhs <: or {
+              $localArr,
+              contains and { JsIdentifierAssignment(),
+              $localArr }
+            }
+          }
         }
       }
     }
@@ -789,6 +876,7 @@ pattern if_else_branches($test, $then, $else) {
     and { $original <: not $setter, $component <: written_outside_effects($original, $setter) },
     and {
       $arg <: not contains prop_reference($component, $body, $params, $unused2),
+      $arg <: not contains custom_context_reference($component, $unusedCtx),
       or {
         $arg <: not contains JsReferenceIdentifier(),
         $arg <: contains and { JsReferenceIdentifier(),
@@ -800,6 +888,7 @@ pattern if_else_branches($test, $then, $else) {
         $ifElse <: contains `$setter($_)`,
         $ifTest <: contains or {
           prop_reference($component, $body, $params, $unusedIfProp),
+          custom_context_reference($component, $unusedIfCtx),
           state_reference($component, $body, $unusedIfState)
         }
       }

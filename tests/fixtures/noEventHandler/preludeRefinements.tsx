@@ -7,6 +7,7 @@ declare function measureAndUpdate(): void;
 declare function track(value: unknown): void;
 declare const globalUrlRegex: RegExp;
 declare const buckets: { get(key: string): string[] };
+declare const sharedQueue: string[];
 const validUrlRegex = /^https?:\/\/\S+$/i;
 const typedUrlRegex: RegExp = /^https?:\/\/\S+$/i;
 const globalFlagRegex = /^https?:\/\/\S+/g;
@@ -247,7 +248,61 @@ export function NonLocalArrayPushStillReported({ active }: { active: boolean }) 
     }
   }, [active]);
 
+  useEffect(() => {
+    if (active) { // expect: noEventHandler
+      {
+        const sharedQueue: string[] = [];
+        void sharedQueue;
+      }
+      sharedQueue.push('x');
+    }
+  }, [active]);
+
   return componentArray.length;
+}
+
+export function CopyArrayMethodsAndDestructuringReassign({
+  rows,
+  active,
+  patterns,
+  url,
+}: {
+  rows: string[];
+  active: boolean;
+  patterns: RegExp[];
+  url: string;
+}) {
+  const [items, setItems] = useState<string[]>([]);
+  const [matched, setMatched] = useState(false);
+
+  useEffect(() => {
+    if (active) {
+      const next = rows.toSorted();
+      next.push('x');
+      setItems(next); // expect: noDerivedState, noDerivedStateDeep
+    }
+  }, [active, rows]);
+
+  useEffect(() => {
+    if (active) { // expect: noEventHandler
+      let next: string[] = [];
+      [next] = [externalStore.items];
+      next.push('x');
+      setItems(next); // expect: noAdjustStateOnPropChange
+    }
+  }, [active]);
+
+  useEffect(() => {
+    if (active) { // expect: noEventHandler
+      for (const validUrlRegex of patterns) {
+        if (validUrlRegex.test(url)) {
+          setMatched(true); // expect: noAdjustStateOnPropChange
+        }
+      }
+    }
+  }, [active, patterns, url]);
+
+  return [items.length, matched];
 }
 
 export function VirtualizerScrollSync({
