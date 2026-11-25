@@ -147,7 +147,8 @@ pattern written_outside_effects($target, $alias) {
       $hook <: or {
         effect_hook(),
         layout_hook(),
-        mount_hook()
+        mount_hook(),
+        effect_event_hook()
       }
     }
   }
@@ -252,11 +253,23 @@ pattern state_source_reference($scope, $local, $source) {
   $ref where { $ref <: identifier_reference(), $ref <: reads_state($scope, $local, $source) }
 }
 
+pattern state_reference_with_source($scope, $local, $ref, $source) {
+  $ref where { $ref <: identifier_reference(), $ref <: reads_state($scope, $local, $source) }
+}
+
 pattern effect_only_state($scope, $body, $source) {
   $source where {
-    $scope <: contains state_declaration($source, $flagSetter, $unusedFlagInit) where {
-      $body <: contains `$flagSetter($_)`,
-      $scope <: not written_outside_effects($flagSetter, $flagSetter)
+    $scope <: contains state_declaration($source, $flagSetter, $flagInit) where {
+      $scope <: not written_outside_effects($flagSetter, $flagSetter),
+      or {
+        $body <: contains `$flagSetter($_)`,
+        $scope <: contains `const $ee = $eeCall` where {
+          $ee <: binding_name(),
+          $ee <: invoked_in($body),
+          $eeCall <: `$eeHook($eeCb)` where { $eeHook <: effect_event_hook(), $eeCb <: contains `$flagSetter($_)` }
+        } until declaration_boundary(),
+        and { $flagInit <: `false`, $scope <: contains `$flagSetter(true)` }
+      }
     } until declaration_boundary()
   }
 }
@@ -317,6 +330,19 @@ pattern parent_callback($scope, $params) {
   }
 }
 
+pattern context_hook_call() {
+  or {
+    `useContext($_)`,
+    `React.useContext($_)`,
+    or {
+      `$ctxHook($...)`,
+      `$ctxHook<$_>($...)`,
+      `$ctxHook()`,
+      `$ctxHook<$_>()`
+    } where { $ctxHook <: r"^use[A-Z][A-Za-z0-9_]*Context$" }
+  }
+}
+
 // One-hop tracing follows props only; context values must be referenced directly.
 pattern prop_reference($scope, $local, $params, $ref) {
   $ref where {
@@ -325,10 +351,7 @@ pattern prop_reference($scope, $local, $params, $ref) {
       $params <: contains and { JsIdentifierBinding(),
       $ref } until JsInitializerClause(),
       $scope <: contains `const $binding = $context` where {
-        $context <: or {
-          `useContext($_)`,
-          `React.useContext($_)`
-        },
+        $context <: context_hook_call(),
         $binding <: or {
           $ref,
           and { JsObjectBindingPattern(),
@@ -352,6 +375,19 @@ pattern prop_reference($scope, $local, $params, $ref) {
                 use_state_call($unusedLocalInit),
                 JsArrayExpression()
               }
+            },
+            `const $binding = $value` where {
+              $binding <: and { JsObjectBindingPattern(),
+              contains and { JsIdentifierBinding(),
+              $ref } until or {
+                JsInitializerClause(),
+                JsComputedMemberName()
+              } },
+              $value <: not or {
+                use_state_call($unusedLocalObjInit),
+                external_hook_call(),
+                JsObjectExpression()
+              }
             }
           } until declaration_boundary(),
           $scope <: contains or {
@@ -364,6 +400,19 @@ pattern prop_reference($scope, $local, $params, $ref) {
               $value <: not or {
                 use_state_call($unusedScopeInit),
                 JsArrayExpression()
+              }
+            },
+            `const $binding = $value` where {
+              $binding <: and { JsObjectBindingPattern(),
+              contains and { JsIdentifierBinding(),
+              $ref } until or {
+                JsInitializerClause(),
+                JsComputedMemberName()
+              } },
+              $value <: not or {
+                use_state_call($unusedScopeObjInit),
+                external_hook_call(),
+                JsObjectExpression()
               }
             }
           } until declaration_boundary()
@@ -447,6 +496,9 @@ pattern syncs_with_browser() {
     `$_.scrollIntoView($_)`,
     `$_.scrollTo($_)`,
     `$_.scrollTo($_, $_)`,
+    `$_.scrollToIndex($...)`,
+    `$_.scrollToOffset($...)`,
+    `$_.scrollBy($...)`,
     `$_.focus()`,
     `$_.focus($_)`
   }
@@ -495,13 +547,13 @@ pattern async_or_fetch_effect() {
 pattern pure_call() {
   or {
     `$_.$method($...)` where {
-      $method <: r"^(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
+      $method <: r"^(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|test|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
     },
     or {
       `$callee($...)`,
       `$callee?.($...)`
     } where {
-      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
+      $callee <: r"^[A-Za-z0-9_$.?\[\]\s]+\?\.(?:find|findIndex|filter|map|flatMap|reduce|reduceRight|some|every|includes|indexOf|lastIndexOf|slice|concat|join|split|trim|trimStart|trimEnd|toLowerCase|toUpperCase|startsWith|endsWith|replace|replaceAll|match|test|has|get|keys|values|entries|toString|valueOf|at|flat|toFixed|charAt|substring|padStart|padEnd)$"
     },
     `$fn($...)` where {
       $fn <: r"^(?:Boolean|String|Number|BigInt|Array|Set|Map|parseInt|parseFloat|isNaN|isFinite|isEqual|encodeURIComponent|decodeURIComponent)$"
@@ -520,6 +572,30 @@ pattern pure_call() {
   }
 }
 
+// `.push()` on a local array initialized inside the same function block (not component- or module-level mutation).
+pattern local_array_push() {
+  `$localArr.push($...)` as $pushCall where {
+    $localArr <: identifier_reference(),
+    $pushCall <: within or {
+      JsFunctionBody(),
+      JsBlockStatement()
+    } as $block where {
+      $pushCall <: direct_in_body($block),
+      $block <: contains or {
+        `const $localArr = $arrInit`,
+        `const $localArr: $_ = $arrInit`,
+        `let $localArr = $arrInit`,
+        `let $localArr: $_ = $arrInit`
+      } where {
+        $arrInit <: or {
+          JsArrayExpression(),
+          pure_call()
+        }
+      } until function_node()
+    }
+  }
+}
+
 // Same-component helper whose body only calls state setters, pure helpers, or .push() on a helper-local array.
 pattern state_only_helper($component) {
   or {
@@ -534,15 +610,7 @@ pattern state_only_helper($component) {
       $hBody <: contains `$s($_)` where { $s <: state_setter($component, $uState, $s) },
       $hBody <: not contains JsCallExpression() as $innerCall where {
         $innerCall <: not pure_call(),
-        $innerCall <: not `$localArr.push($...)` where {
-          $localArr <: identifier_reference(),
-          $hBody <: contains or {
-            `const $localArr = $_`,
-            `const $localArr: $_ = $_`,
-            `let $localArr = $_`,
-            `let $localArr: $_ = $_`
-          } until function_node()
-        },
+        $innerCall <: not local_array_push(),
         $innerCall <: not `$s2($_)` where { $s2 <: state_setter($component, $u2, $s2) },
         $innerCall <: not within `$s2($_)` where { $s2 <: state_setter($component, $u2, $s2) }
       }
@@ -553,6 +621,7 @@ pattern state_only_helper($component) {
 pattern side_effect_call($component) {
   JsCallExpression() as $call where {
     $call <: not pure_call(),
+    $call <: not local_array_push(),
     $call <: not `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) },
     $call <: not within `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) },
     $call <: not state_only_helper($component)
