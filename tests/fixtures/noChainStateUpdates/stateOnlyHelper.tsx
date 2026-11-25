@@ -214,3 +214,79 @@ export function HelperWithExternallyResetLatch() {
 
   return <button type="button" onClick={() => setIsInitialized(false)}>{name}</button>;
 }
+
+export function HelperWithAliasedStateArgument() {
+  const [source] = useState('');
+  const [name, setName] = useState('');
+  const apply = (next: string) => {
+    const value = next;
+    setName(value);
+  };
+
+  useEffect(() => {
+    apply(source); // expect: noDerivedStateDeep
+  }, [source]);
+
+  return name;
+}
+
+export function HelperWithComputedStateArgument() {
+  const [source] = useState('');
+  const [name, setName] = useState('');
+  function apply(next: string) {
+    const value = next.trim();
+    setName(value);
+  }
+
+  useEffect(() => {
+    apply?.(source); // expect: noDerivedStateDeep
+  }, [source]);
+
+  return name;
+}
+
+export function HelperWithLiteralAliasReset() {
+  const [source] = useState('');
+  const [name, setName] = useState('');
+  const reset = (_next: string) => {
+    const value = '';
+    setName(value);
+  };
+
+  useEffect(() => {
+    reset(source); // expect: noChainStateUpdates, noDerivedStateDeep
+  }, [source]);
+
+  return name;
+}
+
+export function BrowserWritingHelper() {
+  const [step] = useState(0);
+  const [name, setName] = useState('');
+  const reset = () => {
+    document.title = '';
+    setName('');
+  };
+
+  useEffect(() => {
+    reset();
+  }, [step]);
+
+  return name;
+}
+
+export function ShadowedBrowserWritingHelper() {
+  const document = { title: '' };
+  const [step] = useState(0);
+  const [name, setName] = useState('');
+  const reset = () => {
+    document.title = '';
+    setName('');
+  };
+
+  useEffect(() => {
+    reset(); // expect: noChainStateUpdates
+  }, [step]);
+
+  return name;
+}

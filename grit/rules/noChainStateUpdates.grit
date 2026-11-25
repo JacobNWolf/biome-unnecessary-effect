@@ -769,6 +769,7 @@ pattern state_only_helper($component) {
       `const $helper = ($...) => $hBody`,
       `function $helper($...) { $hBody }`
     } where {
+      $hBody <: not syncs_with_browser(),
       $hBody <: contains `$s($_)` where { $s <: state_setter($component, $uState, $s) },
       $hBody <: not contains JsCallExpression() as $innerCall where {
         $innerCall <: not pure_call(),
@@ -849,9 +850,20 @@ or {
           $s <: state_setter($component, $state, $s),
           $arg <: not contains state_reference($component, $hBody, $unused4),
           not and {
-            $arg <: contains identifier_reference() as $parameter where {
-              $hParams <: contains and { JsIdentifierBinding(),
-              $parameter }
+            $hParams <: contains JsIdentifierBinding() as $parameter where {
+              or {
+                $arg <: contains and { identifier_reference(),
+                $parameter },
+                $hBody <: contains or {
+                  `const $parameterAlias = $parameterValue`,
+                  `function $parameterAlias() { $parameterValue }`
+                } where {
+                  $parameterValue <: contains and { identifier_reference(),
+                  $parameter },
+                  $arg <: contains and { identifier_reference(),
+                  $parameterAlias }
+                } until declaration_boundary()
+              }
             },
             $call <: contains JsCallArguments() as $helperArgs where {
               $helperArgs <: contains state_reference($component, $body, $unused5)

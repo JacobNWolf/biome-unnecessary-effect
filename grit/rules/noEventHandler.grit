@@ -769,6 +769,7 @@ pattern state_only_helper($component) {
       `const $helper = ($...) => $hBody`,
       `function $helper($...) { $hBody }`
     } where {
+      $hBody <: not syncs_with_browser(),
       $hBody <: contains `$s($_)` where { $s <: state_setter($component, $uState, $s) },
       $hBody <: not contains JsCallExpression() as $innerCall where {
         $innerCall <: not pure_call(),
