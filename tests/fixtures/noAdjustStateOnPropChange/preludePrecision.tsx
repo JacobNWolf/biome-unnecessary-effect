@@ -18,11 +18,13 @@ export function MemberNameCollision({ title, currentPage }: { title: string; cur
   );
 }
 
-export function NestedIdenticalCall({ attemptAt }: { attemptAt: string | null }) {
+export function useNestedIdenticalCall({ attemptAt }: { attemptAt: string | null }) {
+  const [remaining, setRemaining] = useState(0);
   const [isRateLimited, setIsRateLimited] = useState(false);
   useEffect(() => {
     if (!attemptAt) {
       setIsRateLimited(false); // expect: noAdjustStateOnPropChange
+      setRemaining(0); // expect: noAdjustStateOnPropChange
       return;
     }
     const tick = () => {
@@ -30,5 +32,5 @@ export function NestedIdenticalCall({ attemptAt }: { attemptAt: string | null })
     };
     tick();
   }, [attemptAt]);
-  return isRateLimited;
+  return remaining + Number(isRateLimited);
 }

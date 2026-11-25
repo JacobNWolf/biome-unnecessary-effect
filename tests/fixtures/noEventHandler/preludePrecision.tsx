@@ -27,3 +27,17 @@ export function ControllerHookAlias() {
   }, [fetcher.state, fetcher.data]);
   return fetchKey;
 }
+
+export function NestedIdenticalIf({ open }: { open: boolean }) {
+  useEffect(() => {
+    if (open) { // expect: noEventHandler
+      notify('x');
+    }
+    const later = () => {
+      if (open) {
+        notify('x');
+      }
+    };
+    later();
+  }, [open]);
+}

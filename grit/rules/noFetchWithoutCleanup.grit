@@ -171,24 +171,26 @@ pattern identifier_reference() {
 }
 
 // Controller hooks return external handles, not derived copies of state passed in options.
+pattern controller_hook() {
+  or {
+    `useFetcher`,
+    `useNavigate`,
+    `useNavigation`,
+    `useRevalidator`,
+    `useSearchParams`,
+    `useEditor`,
+    `useForm`,
+    `useQueryClient`
+  }
+}
+
 pattern external_hook_call() {
   or {
     `$hook($...)`,
     `$hook<$_>($...)`,
     `$hook()`,
     `$hook<$_>()`
-  } where {
-    $hook <: or {
-      `useFetcher`,
-      `useNavigate`,
-      `useNavigation`,
-      `useRevalidator`,
-      `useSearchParams`,
-      `useEditor`,
-      `useForm`,
-      `useQueryClient`
-    }
-  }
+  } where { $hook <: controller_hook() }
 }
 
 // Tracing follows one hop through component/effect locals, excluding controller hooks and nested functions.
