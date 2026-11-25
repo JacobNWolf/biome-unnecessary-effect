@@ -109,6 +109,7 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
   }, 15_000);
 
   for (const rule of rules) {
+    // Linting the full fixture corpus per rule can exceed Bun's 5s default on slower CI runners.
     test(rule.name, () => {
       const diagnostics = lint(rule.path);
       const actual = diagnostics.map(({ location }) => `${location.path}:${location.start.line}`).sort();
@@ -125,6 +126,30 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         );
         expect(memberCollision?.message).toContain('when "currentPage" changes');
         expect(memberCollision?.message).not.toContain('when "title" changes');
+        const nonDepProp = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/dependencyProps.tsx') && location.start.line === 18,
+        );
+        expect(nonDepProp?.message).toContain('when "fetched" changes');
+        expect(nonDepProp?.message).not.toContain('when "likes" changes');
+        const nonDepGuard = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/dependencyProps.tsx') && location.start.line === 38,
+        );
+        expect(nonDepGuard?.message).toContain('when "userId" changes');
+        expect(nonDepGuard?.message).not.toContain('when "nonDepFlag" changes');
+        const nonDepArgFallback = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/dependencyProps.tsx') && location.start.line === 43,
+        );
+        expect(nonDepArgFallback?.message).toContain('when "userId" changes');
+        expect(nonDepArgFallback?.message).not.toContain('when "nonDepTitle" changes');
+        const invokedFormatter = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/dependencyProps.tsx') && location.start.line === 123,
+        );
+        expect(invokedFormatter?.message).toContain('when "value" changes');
+        expect(invokedFormatter?.message).not.toContain('when "format" changes');
       }
       if (rule.name === 'noChainStateUpdates') {
         const chain = diagnostics.find(
@@ -137,6 +162,31 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         expect(generic?.message).toContain('a key that identifies the item');
         expect(generic?.message).not.toContain('key={data}');
         expect(diagnostics.some(({ message }) => message.includes('key={userId}'))).toBe(true);
+        const modalAt = (line: number) =>
+          diagnostics.find(
+            ({ location }) => location.path.endsWith('modalOpenAdvice.tsx') && location.start.line === line,
+          )?.message;
+        expect(modalAt(12)).toContain('when "isOpen" changes');
+        expect(modalAt(12)).toContain('{isOpen && <Form />}');
+        expect(modalAt(12)).toContain('preserving-and-resetting-state');
+        expect(modalAt(12)).not.toContain('key={');
+        expect(modalAt(34)).toContain('when "open" changes');
+        expect(modalAt(34)).toContain('{open && <Form />}');
+        expect(modalAt(34)).toContain('key={itemId}');
+        expect(modalAt(45)).toContain('when "isModalOpen" changes');
+        expect(modalAt(45)).toContain('{isModalOpen && <Form />}');
+        expect(modalAt(45)).toContain('key={userId}');
+        expect(modalAt(58)).toContain('when "props.isOpen" changes');
+        expect(modalAt(58)).toContain('{props.isOpen && <Form />}');
+        expect(modalAt(69)).toContain('when "visible" changes');
+        expect(modalAt(83)).toContain('when "isVisible" changes');
+        expect(modalAt(94)).toContain('when "show" changes');
+        expect(modalAt(105)).toContain('when "isShown" changes');
+        expect(modalAt(116)).toContain('when "opened" changes');
+        expect(modalAt(127)).toContain('key={userId}');
+        expect(modalAt(127)).not.toContain('when "isOpen" changes');
+        expect(modalAt(140)).toContain('key={tabId}');
+        expect(modalAt(140)).not.toContain('when "isActive" changes');
       }
       if (rule.name === 'noEventHandler') {
         const alias = diagnostics.find(
@@ -165,6 +215,6 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         );
         expect(ordinary?.message).toContain('Pass this value');
       }
-    });
+    }, 15_000);
   }
 });

@@ -592,7 +592,7 @@ pattern enclosing_function($name, $params, $body) {
   $body <: not syncs_with_browser(),
   // An initial read next to a subscription is part of syncing with it.
   $body <: not contains cleanup_return() until function_node(),
-  $call <: within enclosing_function($unused1, $params, $component),
+  $call <: within enclosing_function($name, $params, $component),
   $setter <: state_setter($component, $state, $setter, $original),
   // Setters are stable, so an effect whose only dependency is a setter runs once, like `[]`.
   or {
@@ -602,6 +602,7 @@ pattern enclosing_function($name, $params, $body) {
   },
   or {
     and {
+      $name <: not r"^use(?:IsClient|Client|IsBrowser|Hydrated|IsHydrated|HasHydrated|Mounted|IsMounted|HasMounted)$",
       $arg <: `true`,
       $component <: contains state_declaration($state, $original, $initial) where {
         $initial <: `false`

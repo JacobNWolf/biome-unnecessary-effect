@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent } from 'react';
+import { createContext, useContext, useEffect, useEffectEvent } from 'react';
 
 declare function createConnection(roomId: string): { on: (event: string, cb: () => void) => void; connect: () => void; disconnect: () => void };
 
@@ -14,6 +14,39 @@ export function ChatRoom({ roomId, theme }: { roomId: string; theme: string }) {
     connection.connect();
     return () => connection.disconnect();
   }, [roomId]);
+  return null;
+}
+
+type Connection = { on(event: string, cb: () => void): void; off(event: string, cb: () => void): void };
+const Bus = createContext<{ subscribe(event: string, cb: () => void): () => void }>({
+  subscribe: () => () => {},
+});
+
+export function PropConnection({ connection, theme }: { connection: Connection; theme: string }) {
+  const onConnected = useEffectEvent(() => console.log(theme));
+  useEffect(() => {
+    connection.on('connected', onConnected);
+    return () => connection.off('connected', onConnected);
+  }, [connection]);
+  return null;
+}
+
+export function BusListener({ theme }: { theme: string }) {
+  const { subscribe } = useContext(Bus);
+  const onMsg = useEffectEvent(() => console.log(theme));
+  useEffect(() => subscribe('msg', onMsg), [subscribe]);
+  return null;
+}
+
+export function SubscribeProp({
+  subscribe,
+  theme,
+}: {
+  subscribe: (cb: () => void) => () => void;
+  theme: string;
+}) {
+  const onMsg = useEffectEvent(() => console.log(theme));
+  useEffect(() => subscribe(onMsg), [subscribe]);
   return null;
 }
 

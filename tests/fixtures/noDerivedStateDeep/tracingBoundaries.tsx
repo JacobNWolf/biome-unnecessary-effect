@@ -55,7 +55,7 @@ export function CleanupWriter({ value }: { value: string }) {
 export function AsyncWriter({ value }: { value: string }) {
   const [result, setResult] = useState('');
   useEffect(() => {
-    setResult(value); // expect: noDerivedState
+    setResult(value);
   }, [value]);
   useEffect(() => {
     load().then((response) => setResult(response));
@@ -107,7 +107,7 @@ export function HookReturnedFunction({ id }: { id: string }) {
 export function AssignedPromiseWriter({ value }: { value: string }) {
   const [result, setResult] = useState('');
   useEffect(() => {
-    setResult(value); // expect: noDerivedState
+    setResult(value);
   }, [value]);
   useEffect(() => {
     const pending = load().then((response) => setResult(response));
