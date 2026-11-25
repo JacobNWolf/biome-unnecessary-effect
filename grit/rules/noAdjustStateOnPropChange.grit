@@ -546,9 +546,19 @@ pattern enclosing_function($name, $params, $body) {
     }
   },
   or {
-    $arg <: not contains prop_reference($component, $body, $params, $unused2),
     $component <: written_outside_effects($setter, $original),
-    and { $original <: not $setter, $component <: written_outside_effects($original, $setter) }
+    and { $original <: not $setter, $component <: written_outside_effects($original, $setter) },
+    and {
+      $arg <: not contains prop_reference($component, $body, $params, $unused2),
+      $call <: not within `if ($ifTest) { $ifThen } else { $ifElse }` where {
+        $ifThen <: contains `$setter($_)`,
+        $ifElse <: contains `$setter($_)`,
+        $ifTest <: contains or {
+          prop_reference($component, $body, $params, $unusedIfProp),
+          state_reference($component, $body, $unusedIfState)
+        }
+      }
+    }
   },
   register_diagnostic(span=$call, message=`Avoid adjusting state when a prop changes. Adjust "$state" during render when "$prop" changes, or restructure state so it isn't needed. See https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes`, severity="warn")
 }
