@@ -164,6 +164,15 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         expect(triggerAt(151)).not.toContain('when "editor" changes');
         expect(triggerAt(188)).toContain('when "initialName" changes');
         expect(triggerAt(200)).toContain('when "isOpen" changes');
+        const priority = diagnostics
+          .filter(({ location }) => location.path.endsWith('triggerPriority.tsx'))
+          .sort((a, b) => a.location.start.line - b.location.start.line);
+        expect(priority.map(({ message }) => message.match(/when "([^"]+)" changes/)?.[1])).toEqual([
+          'src',
+          'src',
+          'editor',
+          'editor',
+        ]);
       }
       if (rule.name === 'noChainStateUpdates') {
         const chain = diagnostics.find(

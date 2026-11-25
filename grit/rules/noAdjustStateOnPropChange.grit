@@ -824,7 +824,6 @@ pattern trigger_prop($component, $params, $body, $deps, $prop) {
   }
 }
 
-// Follows one `const` alias so `const next = format(src); setX(next)` blames `src`.
 pattern arg_trigger_prop($component, $params, $body, $deps, $prop) {
   JsReferenceIdentifier() as $ref where {
     or {
@@ -902,8 +901,7 @@ pattern open_prop($component, $params, $openProp) {
 
 pattern open_guard($component, $params, $openProp) {
   or {
-    `if ($guard) return;`,
-    `if ($guard) { return; }`,
+    early_return($guard),
     `if ($guard) { $guardThen }` where {
       $guardThen <: contains `$guardSetter($_)` where {
         $guardSetter <: state_setter($component, $unusedGuardState, $guardSetter)
@@ -918,7 +916,7 @@ pattern open_guard($component, $params, $openProp) {
 }
 
 // Mirrors noResetAllStateOnPropChange's open-guard report so the same effect isn't reported once per setter here.
-pattern open_guard_full_reset($name, $component, $params, $body, $deps) {
+pattern open_guard_full_reset($name, $component, $params, $deps) {
   $body where {
     $name <: r"[A-Z][A-Za-z0-9_]*",
     // Text prefilter: this check runs for every setter call, and few effects mention an open prop.
@@ -1005,7 +1003,7 @@ pattern if_else_branches($test, $then, $else) {
   $call <: direct_in_body($body),
   $call <: within enclosing_function($unused1, $params, $component),
   $setter <: state_setter($component, $state, $setter, $original),
-  $body <: not open_guard_full_reset($unused1, $component, $params, $body, $deps),
+  $body <: not open_guard_full_reset($unused1, $component, $params, $deps),
   $deps <: contains prop_or_context($component, $params, $dependencyProp) where {
     $dependencyProp <: not invoked_in($body)
   },
@@ -1020,33 +1018,21 @@ pattern if_else_branches($test, $then, $else) {
     }
   },
   or {
-    and {
-      $arg <: contains arg_trigger_prop($component, $params, $body, $deps, $argProp),
-      or {
-        and {
-          $argProp <: controller_prop(),
-          $arg <: contains arg_trigger_prop($component, $params, $body, $deps, $prop) where {
-            $prop <: not controller_prop()
-          }
-        },
-        $prop = $argProp
-      }
+    $arg <: contains arg_trigger_prop($component, $params, $body, $deps, $prop) where {
+      $prop <: not controller_prop()
     },
+    $arg <: contains arg_trigger_prop($component, $params, $body, $deps, $prop),
     and {
       $arg <: not contains arg_trigger_prop($component, $params, $body, $deps, $unusedArgProp),
       or {
         and {
           $call <: within `if ($test) { $_ }`,
-          $test <: contains trigger_prop($component, $params, $body, $deps, $testProp),
           $test <: not state_driven_guard($component, $body, $arg),
           or {
-            and {
-              $testProp <: controller_prop(),
-              $test <: contains trigger_prop($component, $params, $body, $deps, $prop) where {
-                $prop <: not controller_prop()
-              }
+            $test <: contains trigger_prop($component, $params, $body, $deps, $prop) where {
+              $prop <: not controller_prop()
             },
-            $prop = $testProp
+            $test <: contains trigger_prop($component, $params, $body, $deps, $prop)
           }
         },
         and {
