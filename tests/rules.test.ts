@@ -125,6 +125,17 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         );
         expect(memberCollision?.message).toContain('when "currentPage" changes');
         expect(memberCollision?.message).not.toContain('when "title" changes');
+        const nonDepProp = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/falsePositives.tsx') && location.start.line === 19,
+        );
+        expect(nonDepProp?.message).toContain('when "fetched" changes');
+        expect(nonDepProp?.message).not.toContain('when "likes" changes');
+        const literalResetOnOpen = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/falsePositives.tsx') && location.start.line === 119,
+        );
+        expect(literalResetOnOpen?.message).toContain('when "isOpen" changes');
       }
       if (rule.name === 'noChainStateUpdates') {
         const chain = diagnostics.find(

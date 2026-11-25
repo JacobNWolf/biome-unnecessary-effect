@@ -526,29 +526,77 @@ pattern enclosing_function($name, $params, $body) {
   },
   $cb <: sync_callback($body),
   $body <: not syncs_with_browser(),
+  $body <: not async_or_fetch_effect(),
   $call <: direct_in_body($body),
   $call <: within enclosing_function($unused1, $params, $component),
   $setter <: state_setter($component, $state, $setter, $original),
-  $deps <: contains prop_or_context($component, $params, $dependencyProp),
-  or {
-    $arg <: contains prop_or_context($component, $params, $prop),
-    and {
-      $arg <: not contains prop_or_context($component, $params, $unusedArgProp),
-      $call <: within `if ($test) { $_ }`,
-      $test <: contains prop_or_context($component, $params, $prop)
-    },
-    and {
-      $arg <: not contains prop_or_context($component, $params, $unusedArgProp),
-      $call <: not within `if ($guard) { $_ }` where {
-        $guard <: contains prop_or_context($component, $params, $unusedGuardProp)
-      },
-      $deps <: contains prop_or_context($component, $params, $prop)
+  $deps <: contains prop_or_context($component, $params, $dependencyProp) where {
+    $dependencyProp <: not invoked_in($body)
+  },
+  // Avoids JsIfStatement(consequent = ...), which Biome 2.4.5 cannot compile.
+  $call <: not within JsElseClause() as $elseClause where {
+    $elseClause <: within JsIfStatement() as $ifStmt where {
+      $ifStmt <: contains `$setter($_)` as $earlierCall where { $earlierCall <: not within $elseClause }
     }
   },
   or {
-    $arg <: not contains prop_reference($component, $body, $params, $unused2),
+    $arg <: contains prop_or_context($component, $params, $prop) where {
+      $prop <: not invoked_in($body),
+      $deps <: contains and { JsReferenceIdentifier(),
+      $prop }
+    },
+    and {
+      $arg <: not contains prop_or_context($component, $params, $unusedArgProp) where {
+        $unusedArgProp <: not invoked_in($body),
+        $deps <: contains and { JsReferenceIdentifier(),
+        $unusedArgProp }
+      },
+      $call <: within `if ($test) { $_ }`,
+      $test <: contains prop_or_context($component, $params, $prop) where {
+        $prop <: not invoked_in($body),
+        $deps <: contains and { JsReferenceIdentifier(),
+        $prop },
+        not and {
+          $prop <: r"^(?:open|isOpen|enabled|isEnabled|visible|isVisible|show|isShown)$",
+          $arg <: or {
+            contains identifier_reference(),
+            contains function_node()
+          }
+        }
+      }
+    },
+    and {
+      $arg <: not contains prop_or_context($component, $params, $unusedArgProp2) where {
+        $unusedArgProp2 <: not invoked_in($body),
+        $deps <: contains and { JsReferenceIdentifier(),
+        $unusedArgProp2 }
+      },
+      $call <: not within `if ($guard) { $_ }` where {
+        $guard <: contains prop_or_context($component, $params, $unusedGuardProp) where {
+          $unusedGuardProp <: not invoked_in($body),
+          $deps <: contains and { JsReferenceIdentifier(),
+          $unusedGuardProp }
+        }
+      },
+      $deps <: contains prop_or_context($component, $params, $prop) where {
+        $prop <: not invoked_in($body),
+        not and {
+          $prop <: r"^(?:open|isOpen|enabled|isEnabled|visible|isVisible|show|isShown|editor|provider)$",
+          $arg <: or {
+            contains identifier_reference(),
+            contains function_node()
+          }
+        }
+      }
+    }
+  },
+  or {
     $component <: written_outside_effects($setter, $original),
-    and { $original <: not $setter, $component <: written_outside_effects($original, $setter) }
+    and { $original <: not $setter, $component <: written_outside_effects($original, $setter) },
+    and {
+      $arg <: not contains prop_reference($component, $body, $params, $unused2),
+      $arg <: not contains state_reference($component, $body, $unused3)
+    }
   },
   register_diagnostic(span=$call, message=`Avoid adjusting state when a prop changes. Adjust "$state" during render when "$prop" changes, or restructure state so it isn't needed. See https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes`, severity="warn")
 }
