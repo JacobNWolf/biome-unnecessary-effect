@@ -97,3 +97,120 @@ export function PropTriggeredHelper({ shouldReset }: { shouldReset: boolean }) {
 
   return name;
 }
+
+export function HelperWithStateArgument() {
+  const [source] = useState('');
+  const [name, setName] = useState('');
+  const apply = (next: string) => {
+    setName(next);
+  };
+
+  useEffect(() => {
+    apply(source); // expect: noDerivedStateDeep
+  }, [source]);
+
+  return name;
+}
+
+export function OneShotHelper() {
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [name, setName] = useState('');
+  const initialize = () => {
+    setName('ready');
+    setIsInitialized(true);
+  };
+
+  useEffect(() => {
+    if (!isInitialized) initialize();
+  }, [isInitialized]);
+
+  return name;
+}
+
+export function HelperWithBothStatesInDeps() {
+  const [flag, setFlag] = useState(true);
+  const [other] = useState(0);
+  const reset = () => {
+    setFlag(false);
+  };
+
+  useEffect(() => {
+    reset(); // expect: noChainStateUpdates
+  }, [flag, other]);
+
+  return flag;
+}
+
+export function HelperWithLiteralArgument() {
+  const [step] = useState(0);
+  const [name, setName] = useState('');
+  const reset = (next: string) => {
+    setName(next);
+  };
+
+  useEffect(() => {
+    reset(''); // expect: noChainStateUpdates
+  }, [step]);
+
+  return name;
+}
+
+export function HelperWithUnusedStateArgument() {
+  const [source] = useState('');
+  const [name, setName] = useState('');
+  const reset = (_next: string) => {
+    setName('');
+  };
+
+  useEffect(() => {
+    reset(source); // expect: noChainStateUpdates, noDerivedStateDeep
+  }, [source]);
+
+  return name;
+}
+
+export function HelperWithDerivedAndResetUpdates() {
+  const [source] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const reset = (next: string) => {
+    setName(next);
+    setError(null);
+  };
+
+  useEffect(() => {
+    reset(source); // expect: noChainStateUpdates, noDerivedStateDeep
+  }, [source]);
+
+  return name + error;
+}
+
+export function OptionalOneShotFunctionHelper() {
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [name, setName] = useState('');
+  function initialize() {
+    setName('ready');
+    setIsInitialized(true);
+  }
+
+  useEffect(() => {
+    if (!isInitialized) initialize?.();
+  }, [isInitialized]);
+
+  return name;
+}
+
+export function HelperWithExternallyResetLatch() {
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [name, setName] = useState('');
+  const initialize = () => {
+    setName('ready');
+    setIsInitialized(true);
+  };
+
+  useEffect(() => {
+    if (!isInitialized) initialize(); // expect: noChainStateUpdates
+  }, [isInitialized]);
+
+  return <button type="button" onClick={() => setIsInitialized(false)}>{name}</button>;
+}

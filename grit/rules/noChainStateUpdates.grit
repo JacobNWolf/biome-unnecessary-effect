@@ -826,23 +826,42 @@ or {
   $body <: not contains cleanup_return() until function_node(),
   $call <: within enclosing_function($unused1, $params, $component),
   or {
-    and { $call <: `$callee($arg)`, $callee <: state_setter($component, $state, $callee) },
+    and {
+      $call <: `$callee($arg)`,
+      $callee <: state_setter($component, $state, $callee),
+      $updateBody = $body,
+      $updateOwner = $effect
+    },
     and {
       $call <: state_only_helper($component),
       $component <: contains or {
-        `const $callee = ($...) => $hBody`,
-        `function $callee($...) { $hBody }`
+        `const $callee = ($hParams) => $hBody`,
+        `function $callee($hParams) { $hBody }`
       } as $helper where {
         $helper <: not or {
           `const $callee = async ($...) => $asyncBody`,
           `async function $callee($...) { $asyncBody }`
         },
-        // Later clauses do not backtrack into this search, so skip setters for states already in the deps.
+        $updateBody = $hBody,
+        $updateOwner = $helper,
+        // Keep candidate checks inside contains so a rejected setter does not hide later ones.
         $hBody <: contains `$s($arg)` where {
           $s <: state_setter($component, $state, $s),
           $arg <: not contains state_reference($component, $hBody, $unused4),
-          $deps <: not contains and { JsReferenceIdentifier(),
-          $state }
+          not and {
+            $arg <: contains identifier_reference() as $parameter where {
+              $hParams <: contains and { JsIdentifierBinding(),
+              $parameter }
+            },
+            $call <: contains JsCallArguments() as $helperArgs where {
+              $helperArgs <: contains state_reference($component, $body, $unused5)
+            }
+          },
+          $deps <: contains and { JsReferenceIdentifier(),
+          binding_name() } as $helperDep where {
+            $helperDep <: reads_state($component, $body, $helperSource),
+            $helperSource <: not $state
+          } until JsCallExpression()
         } until function_node()
       } until declaration_boundary()
     }
@@ -858,9 +877,15 @@ or {
         `if ($latchGuard) $latchThen`
       } where { $latchGuard <: contains `!$source`, $call <: within $latchThen },
       $component <: contains state_declaration($source, $latchSetter, $uInit) where {
-        $body <: contains `$latchSetter(true)` until function_node(),
+        or {
+          $body <: contains `$latchSetter(true)` until function_node(),
+          $updateBody <: contains `$latchSetter(true)` until function_node()
+        },
         $component <: not contains and { JsReferenceIdentifier(),
-        $latchSetter } as $otherLatchUse where { $otherLatchUse <: not within $effect }
+        $latchSetter } as $otherLatchUse where {
+          $otherLatchUse <: not within $effect,
+          $otherLatchUse <: not within $updateOwner
+        }
       } until declaration_boundary()
     },
     not and {

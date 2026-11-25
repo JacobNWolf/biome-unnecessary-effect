@@ -163,6 +163,8 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         expect(helperAt(14)).toContain('Update "name" in the same event handler that changes "isOpen"');
         expect(helperAt(32)).toContain('changes "step"');
         expect(helperAt(63)).toContain('Update "name" in the same event handler that changes "isOpen"');
+        expect(helperAt(138)).toContain('Update "flag" in the same event handler that changes "other"');
+        expect(helperAt(182)).toContain('Update "error" in the same event handler that changes "source"');
       }
       if (rule.name === 'noResetAllStateOnPropChange') {
         const generic = diagnostics.find(({ location }) => location.path.endsWith('keyAdvice.tsx'));
