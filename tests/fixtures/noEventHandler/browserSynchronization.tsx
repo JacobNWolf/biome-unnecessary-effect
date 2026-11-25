@@ -14,6 +14,11 @@ export function BrowserSynchronization({ active, value }: { active: boolean; val
     if (document.referrer && active) console.log('arrived');
   }, [active]);
   useEffect(() => {
+    if (document?.referrer?.includes('checkout') && active) {
+      console.log('arrived');
+    }
+  }, [active]);
+  useEffect(() => {
     target.current = document.getElementById('target');
     setLabel('ready');
   }, []);

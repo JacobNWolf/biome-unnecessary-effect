@@ -68,6 +68,11 @@ pattern function_node() {
   }
 }
 
+// Checks AST ancestry rather than `contains $node`, which compares by text and re-reports nested duplicates.
+pattern direct_in_body($body) {
+  $node where { $node <: within $body, $node <: not within function_node() as $inner where { $inner <: within $body } }
+}
+
 // Component-local declarations cannot occur inside expressions or another function.
 pattern declaration_boundary() {
   or {
@@ -156,7 +161,40 @@ pattern binding_name() {
   not r"(?:true|false|null|undefined|this)" }
 }
 
-// Tracing follows one hop through component/effect locals, excluding other nested functions.
+// Excludes property names (JsName); callees bind JsIdentifierExpression, references bind JsReferenceIdentifier, JSX components bind JsxReferenceIdentifier.
+pattern identifier_reference() {
+  and { or {
+    JsReferenceIdentifier(),
+    JsIdentifierExpression(),
+    JsxReferenceIdentifier()
+  },
+  binding_name() }
+}
+
+// Controller hooks return external handles, not derived copies of state passed in options.
+pattern controller_hook() {
+  or {
+    `useFetcher`,
+    `useNavigate`,
+    `useNavigation`,
+    `useRevalidator`,
+    `useSearchParams`,
+    `useEditor`,
+    `useForm`,
+    `useQueryClient`
+  }
+}
+
+pattern external_hook_call() {
+  or {
+    `$hook($...)`,
+    `$hook<$_>($...)`,
+    `$hook()`,
+    `$hook<$_>()`
+  } where { $hook <: controller_hook() }
+}
+
+// Tracing follows one hop through component/effect locals, excluding controller hooks and nested functions.
 pattern reads_state($scope, $local, $source) {
   $value where {
     $scope <: contains or {
@@ -168,7 +206,8 @@ pattern reads_state($scope, $local, $source) {
       $source <: binding_name(),
       or {
         $value <: or {
-          $source,
+          and { identifier_reference(),
+          $source },
           contains and { JsReferenceIdentifier(),
           $source }
         },
@@ -177,8 +216,10 @@ pattern reads_state($scope, $local, $source) {
           `function $alias() { $aliasValue }`
         } where {
           $alias <: binding_name(),
+          $aliasValue <: not external_hook_call(),
           $value <: or {
-            $alias,
+            and { identifier_reference(),
+            $alias },
             contains and { JsReferenceIdentifier(),
             $alias }
           },
@@ -190,8 +231,10 @@ pattern reads_state($scope, $local, $source) {
           `function $alias() { $aliasValue }`
         } where {
           $alias <: binding_name(),
+          $aliasValue <: not external_hook_call(),
           $value <: or {
-            $alias,
+            and { identifier_reference(),
+            $alias },
             contains and { JsReferenceIdentifier(),
             $alias }
           },
@@ -204,7 +247,19 @@ pattern reads_state($scope, $local, $source) {
 }
 
 pattern state_reference($scope, $local, $ref) {
-  $ref where { $ref <: binding_name(), $ref <: reads_state($scope, $local) }
+  $ref where { $ref <: identifier_reference(), $ref <: reads_state($scope, $local) }
+}
+
+pattern state_source_reference($scope, $local, $source) {
+  $ref where { $ref <: identifier_reference(), $ref <: reads_state($scope, $local, $source) }
+}
+
+pattern effect_only_state($scope, $source) {
+  $source where {
+    $scope <: contains state_declaration($source, $flagSetter, $unusedFlagInit) where {
+      $scope <: not written_outside_effects($flagSetter, $flagSetter)
+    } until declaration_boundary()
+  }
 }
 
 pattern prop_expression($params) {
@@ -220,7 +275,7 @@ pattern prop_expression($params) {
 
 pattern prop_or_context($scope, $params, $ref) {
   $ref where {
-    $ref <: binding_name(),
+    $ref <: identifier_reference(),
     or {
       $params <: contains and { JsIdentifierBinding(),
       $ref } until JsInitializerClause(),
@@ -266,7 +321,7 @@ pattern parent_callback($scope, $params) {
 // One-hop tracing follows props only; context values must be referenced directly.
 pattern prop_reference($scope, $local, $params, $ref) {
   $ref where {
-    $ref <: binding_name(),
+    $ref <: identifier_reference(),
     or {
       $params <: contains and { JsIdentifierBinding(),
       $ref } until JsInitializerClause(),
@@ -315,7 +370,7 @@ pattern prop_reference($scope, $local, $params, $ref) {
           } until declaration_boundary()
         },
         $value <: contains $source where {
-          $source <: binding_name(),
+          $source <: identifier_reference(),
           $params <: contains and { JsIdentifierBinding(),
           $source } until JsInitializerClause()
         }
@@ -385,7 +440,8 @@ pattern syncs_with_browser() {
     `new IntersectionObserver($_)`,
     `new IntersectionObserver($_, $_)`,
     `new MutationObserver($_)`,
-    `$browser.$_` where { $browser <: browser_global() },
+    // Matches both `.` and `?.`; Biome GritQL cannot compile `$browser?.$_`.
+    JsStaticMemberExpression(object=$browser) where { $browser <: browser_global() },
     `$browser.$_ = $_` where { $browser <: browser_global() },
     `$browser($_)` where { $browser <: r"requestAnimationFrame|cancelAnimationFrame", $browser <: browser_global() },
     `$_.scrollIntoView()`,
@@ -405,6 +461,32 @@ pattern reads_dom() {
     `new IntersectionObserver($_)`,
     `new IntersectionObserver($_, $_)`,
     `new MutationObserver($_)`
+  }
+}
+
+// Snippet variants avoid JsCallExpression(callee = ...), which Biome 2.4.5 cannot compile.
+pattern invoked_in($body) {
+  $fn where {
+    $body <: contains or {
+      `$fn($...)`,
+      `$fn()`,
+      `$fn?.($...)`,
+      `$fn?.()`,
+      `$fn!($...)`,
+      `$fn!()`
+    }
+  }
+}
+
+pattern async_or_fetch_effect() {
+  contains or {
+    `await $_`,
+    `$_.then($...)`,
+    `fetch($...)`,
+    `axios($...)`,
+    `axios.$_($...)`,
+    `ky($...)`,
+    `ky.$_($...)`
   }
 }
 
@@ -443,7 +525,7 @@ pattern enclosing_function($name, $params, $body) {
     `$hook($cb)` where { $hook <: mount_hook() }
   },
   $cb <: sync_callback($body),
-  $body <: contains $call until function_node(),
+  $call <: direct_in_body($body),
   $body <: not syncs_with_browser(),
   // An initial read next to a subscription is part of syncing with it.
   $body <: not contains cleanup_return() until function_node(),

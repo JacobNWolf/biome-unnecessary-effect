@@ -119,6 +119,12 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
       if (rule.name === 'noAdjustStateOnPropChange') {
         const adjustment = diagnostics.find(({ location }) => location.path.endsWith('triggerBindings.tsx'));
         expect(adjustment?.message).toContain('when "isOpen" changes');
+        const memberCollision = diagnostics.find(
+          ({ location }) =>
+            location.path.endsWith('noAdjustStateOnPropChange/preludePrecision.tsx') && location.start.line === 10,
+        );
+        expect(memberCollision?.message).toContain('when "currentPage" changes');
+        expect(memberCollision?.message).not.toContain('when "title" changes');
       }
       if (rule.name === 'noChainStateUpdates') {
         const chain = diagnostics.find(
