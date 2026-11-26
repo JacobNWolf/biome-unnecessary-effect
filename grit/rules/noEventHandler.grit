@@ -291,6 +291,7 @@ pattern effect_only_state($scope, $body, $source) {
 pattern prop_expression($params) {
   or {
     `$object.$_`,
+    JsStaticMemberExpression(object=$object),
     $object
   } where {
     $object <: binding_name(),
@@ -780,37 +781,7 @@ pattern state_only_helper($component) {
     } until declaration_boundary()
   }
 }
-// Calls inside setter arguments compute the next value rather than synchronize an external system.
-pattern side_effect_call($component) {
-  JsCallExpression() as $call where {
-    $call <: not pure_call(),
-    $call <: not local_array_push(),
-    $call <: not `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) },
-    $call <: not within `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) },
-    $call <: not state_only_helper($component)
-  }
-}
 
-pattern enclosing_function($name, $params, $body) {
-  and { or {
-    JsFunctionDeclaration(),
-    JsFunctionExpression(),
-    JsVariableDeclaration()
-  },
-  or {
-    `function $name($params) { $body }`,
-    `const $name = ($params) => $body`,
-    `const $name = function ($params) { $body }`,
-    `const $name = $_(($params) => $body)`,
-    `const $name = $_(function ($params) { $body })`,
-    `const $name = $_(function $_($params) { $body })`,
-    `const $name = (($params) => $body) satisfies $_`,
-    `const $name = (($params) => $body) as $_`,
-    `const $name = $_(($params) => $body) as $_`,
-    `const $name = $_(function ($params) { $body }) as $_`
-  } } where { $name <: r"[A-Z][A-Za-z0-9_]*|use[A-Z][A-Za-z0-9_]*" }
-}
-// prelude:end
 pattern hook_setter($component, $setter) {
   $setter as $setterUse where {
     $setter <: identifier_reference(),
@@ -870,6 +841,54 @@ pattern hook_setter($component, $setter) {
     }
   }
 }
+
+pattern custom_state_hook_declaration($state, $setter) {
+  or {
+    `const [$state, $setter] = $call`,
+    `const [$state = $_, $setter] = $call`
+  } where {
+    $state <: binding_name(),
+    $setter <: r"set[A-Z][A-Za-z0-9_$]*",
+    $call <: or {
+      `$hook($...)`,
+      `$hook<$_>($...)`,
+      `$hook()`,
+      `$hook<$_>()`
+    } where { $hook <: r"^use[A-Z][A-Za-z0-9_]*State$" }
+  }
+}
+
+// Calls inside setter arguments compute the next value rather than synchronize an external system.
+pattern side_effect_call($component) {
+  JsCallExpression() as $call where {
+    $call <: not pure_call(),
+    $call <: not local_array_push(),
+    $call <: not `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) },
+    $call <: not within `$setter($_)` where { $setter <: state_setter($component, $unusedState, $setter) },
+    $call <: not state_only_helper($component)
+  }
+}
+
+pattern enclosing_function($name, $params, $body) {
+  and { or {
+    JsFunctionDeclaration(),
+    JsFunctionExpression(),
+    JsVariableDeclaration()
+  },
+  or {
+    `function $name($params) { $body }`,
+    `const $name = ($params) => $body`,
+    `const $name = function ($params) { $body }`,
+    `const $name = $_(($params) => $body)`,
+    `const $name = $_(function ($params) { $body })`,
+    `const $name = $_(function $_($params) { $body })`,
+    `const $name = (($params) => $body) satisfies $_`,
+    `const $name = (($params) => $body) as $_`,
+    `const $name = $_(($params) => $body) as $_`,
+    `const $name = $_(function ($params) { $body }) as $_`
+  } } where { $name <: r"[A-Z][A-Za-z0-9_]*|use[A-Z][A-Za-z0-9_]*" }
+}
+// prelude:end
 
 pattern event_side_effect_call($component) {
   side_effect_call($component) as $call where {

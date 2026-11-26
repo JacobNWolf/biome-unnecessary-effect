@@ -58,3 +58,71 @@ export function SyncResetAlongsideAsync({ userId }: { userId: string }) {
 
   return `${page}:${otherPage}:${thirdPage}:${data}`;
 }
+
+export function Multiselect({ staticOptions, onSearch }) {
+  const [options, setOptions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!staticOptions && onSearch) {
+      setLoading(true);
+      onSearch().then(o => setOptions(o)).finally(() => setLoading(false));
+    } else {
+      const filtered = staticOptions.filter(o => o.length > 0);
+      setOptions(filtered); // expect: noAdjustStateOnPropChange
+    }
+  }, [staticOptions, onSearch]);
+  return <button onClick={() => setOptions([])}>{String(loading)}{options.length}</button>;
+}
+
+export function FontPicker({ staticOptions, onSearch }) {
+  const [options, setOptions] = useState<string[]>([]);
+  useEffect(() => {
+    if (staticOptions) {
+      setOptions(staticOptions);
+    } else {
+      onSearch().then(o => setOptions(o));
+    }
+  }, [staticOptions, onSearch]);
+  return <button onClick={() => setOptions([])}>{options.length}</button>;
+}
+
+export function AsyncBeforeBranch({ staticOptions, onSearch }) {
+  const [options, setOptions] = useState<string[]>([]);
+  useEffect(() => {
+    onSearch().then(setOptions);
+    if (!staticOptions) {
+      return;
+    } else {
+      setOptions(staticOptions);
+    }
+  }, [staticOptions, onSearch]);
+  return <button onClick={() => setOptions([])}>{options.length}</button>;
+}
+
+export function AsyncInsideElse({ staticOptions, onSearch }) {
+  const [options, setOptions] = useState<string[]>([]);
+  useEffect(() => {
+    if (!staticOptions) {
+      onSearch().then(setOptions);
+    } else {
+      setOptions(staticOptions);
+      onSearch().then(() => {}, () => setOptions([]));
+    }
+  }, [staticOptions, onSearch]);
+  return <button onClick={() => setOptions([])}>{options.length}</button>;
+}
+
+export function AsyncOutsideNestedBranch({ enabled, staticOptions, onSearch }) {
+  const [options, setOptions] = useState<string[]>([]);
+  useEffect(() => {
+    if (enabled) { // expect: noEventHandler
+      onSearch().then(setOptions);
+      if (!staticOptions) {
+        return;
+      } else {
+        setOptions(staticOptions);
+      }
+    }
+  }, [enabled, staticOptions, onSearch]);
+  return <button onClick={() => setOptions([])}>{options.length}</button>;
+}

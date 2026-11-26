@@ -291,6 +291,7 @@ pattern effect_only_state($scope, $body, $source) {
 pattern prop_expression($params) {
   or {
     `$object.$_`,
+    JsStaticMemberExpression(object=$object),
     $object
   } where {
     $object <: binding_name(),
@@ -780,6 +781,83 @@ pattern state_only_helper($component) {
     } until declaration_boundary()
   }
 }
+
+pattern hook_setter($component, $setter) {
+  $setter as $setterUse where {
+    $setter <: identifier_reference(),
+    $setter <: r"set[A-Z][A-Za-z0-9_$]*",
+    $component <: contains `const $binding = $hookCall` as $hookDeclaration where {
+      $hookCall <: or {
+        `$hook($...)`,
+        `$hook<$_>($...)`,
+        `$hook()`,
+        `$hook<$_>()`
+      } where { $hook <: r"^use[A-Z][A-Za-z0-9_]*$" },
+      $binding <: and { or {
+        JsArrayBindingPattern(),
+        JsObjectBindingPattern()
+      },
+      contains and { JsIdentifierBinding(),
+      $setter } until or {
+        JsInitializerClause(),
+        JsComputedMemberName()
+      } }
+    } until declaration_boundary(),
+    $setterUse <: not within or {
+      function_node(),
+      JsBlockStatement(),
+      JsCatchClause(),
+      JsForStatement(),
+      JsForInStatement(),
+      JsForOfStatement()
+    } as $scope where {
+      $scope <: within $component,
+      $scope <: contains and { $setter,
+      JsIdentifierBinding() } as $shadowBinding where {
+        $shadowBinding <: not within $hookDeclaration,
+        $shadowBinding <: not within or {
+          function_node(),
+          JsBlockStatement(),
+          JsCatchClause(),
+          JsForStatement(),
+          JsForInStatement(),
+          JsForOfStatement()
+        } as $innerScope where {
+          $innerScope <: not $scope,
+          $innerScope <: within $scope,
+          $innerScope <: not `function $setter($...) { $... }`,
+          or {
+            $innerScope <: function_node(),
+            $shadowBinding <: not within and { JsVariableDeclaration(),
+            r"(?s)var\s.*" }
+          }
+        }
+      } until or {
+        JsInitializerClause(),
+        JsComputedMemberName(),
+        JsExpressionStatement(),
+        JsReturnStatement()
+      }
+    }
+  }
+}
+
+pattern custom_state_hook_declaration($state, $setter) {
+  or {
+    `const [$state, $setter] = $call`,
+    `const [$state = $_, $setter] = $call`
+  } where {
+    $state <: binding_name(),
+    $setter <: r"set[A-Z][A-Za-z0-9_$]*",
+    $call <: or {
+      `$hook($...)`,
+      `$hook<$_>($...)`,
+      `$hook()`,
+      `$hook<$_>()`
+    } where { $hook <: r"^use[A-Z][A-Za-z0-9_]*State$" }
+  }
+}
+
 // Calls inside setter arguments compute the next value rather than synchronize an external system.
 pattern side_effect_call($component) {
   JsCallExpression() as $call where {
@@ -814,12 +892,49 @@ pattern enclosing_function($name, $params, $body) {
 
 pattern controller_prop() { r"^(?:editor|provider|queryClient|router|fetcher)$" }
 
+// Keep two-hop destructuring local: sharing it makes noEventHandler report async image fetching.
+pattern nested_prop_reference($scope, $params, $ref) {
+  $ref where {
+    $ref <: identifier_reference(),
+    $scope <: contains `const $binding = $value` where {
+      $binding <: or {
+        $ref,
+        and { JsObjectBindingPattern(),
+        contains and { JsIdentifierBinding(),
+        $ref } until or {
+          JsInitializerClause(),
+          JsComputedMemberName()
+        } }
+      },
+      $value <: JsStaticMemberExpression(object=$nestedObj) where {
+        $nestedObj <: binding_name(),
+        $scope <: contains `const $outerBinding = $outerValue` where {
+          $outerValue <: prop_expression($params),
+          $outerBinding <: or {
+            $nestedObj,
+            and { JsObjectBindingPattern(),
+            contains and { JsIdentifierBinding(),
+            $nestedObj } until or {
+              JsInitializerClause(),
+              JsComputedMemberName()
+            } }
+          }
+        } until declaration_boundary()
+      }
+    } until declaration_boundary()
+  }
+}
+
 // Checks $deps before scanning the component or effect body so non-dependency identifiers fail fast.
 pattern trigger_prop($component, $params, $body, $deps, $prop) {
   JsReferenceIdentifier() as $prop where {
     $deps <: contains and { JsReferenceIdentifier(),
     $prop },
-    $prop <: prop_or_context($component, $params, $prop),
+    or {
+      $prop <: prop_or_context($component, $params, $prop),
+      $prop <: nested_prop_reference($component, $params, $prop),
+      $prop <: custom_context_reference($component, $prop)
+    },
     $prop <: not invoked_in($body)
   }
 }
@@ -861,10 +976,34 @@ pattern early_return($test) {
   }
 }
 
-pattern literal_arg() {
+pattern literal_arg($component) {
   or {
     not contains JsReferenceIdentifier(),
-    `undefined`
+    `undefined`,
+    $constRef where {
+      $constRef <: identifier_reference(),
+      $program <: contains and { $constRef,
+      JsIdentifierBinding() } as $topConstBinding where {
+        $topConstBinding <: within and { JsVariableDeclaration(),
+        r"^const\b[\s\S]*" },
+        $topConstBinding <: within JsVariableDeclarator() as $topConstDeclarator,
+        $topConstDeclarator <: not contains function_node() until or {
+          JsCallExpression(),
+          JsNewExpression(),
+          JsObjectExpression(),
+          JsArrayExpression()
+        }
+      } until or {
+        function_node(),
+        JsBlockStatement(),
+        JsExpressionStatement()
+      },
+      $component <: not contains and { JsIdentifierBinding(),
+      $constRef },
+      $component <: within enclosing_function($unusedConstName, $constParams, $component),
+      $constParams <: not contains and { JsIdentifierBinding(),
+      $constRef } until JsInitializerClause()
+    }
   }
 }
 
@@ -882,8 +1021,18 @@ pattern seeded_state_guard($component, $body) {
 pattern state_driven_guard($component, $body, $arg) {
   contains and { JsReferenceIdentifier(),
   $driver } where {
-    $component <: contains state_declaration($driver, $driverSetter, $driverInit) until declaration_boundary(),
-    or { $body <: not contains `$driverSetter($_)` until function_node(), $arg <: not literal_arg() }
+    $component <: contains or {
+      state_declaration($driver, $driverSetter, $driverInit),
+      custom_state_hook_declaration($driver, $driverSetter)
+    } until declaration_boundary(),
+    or { $body <: not contains `$driverSetter($_)` until function_node(), $arg <: not literal_arg($component) }
+  }
+}
+
+pattern updater_declaration($updater) {
+  or {
+    `function $updater($_) { $_ }`,
+    `const $updater = $updaterValue` where { $updaterValue <: function_node() }
   }
 }
 
@@ -992,6 +1141,43 @@ pattern if_else_branches($test, $then, $else) {
   }
 }
 
+pattern async_setter_write($setter) {
+  or {
+    or {
+      `$_.then($cb1)`,
+      `$_.catch($cb1)`,
+      `$_.finally($cb1)`
+    } where {
+      $cb1 <: contains and { JsReferenceIdentifier(),
+      $setter }
+    },
+    `$_.then($cb1, $cb2)` where {
+      or {
+        $cb1 <: contains and { JsReferenceIdentifier(),
+        $setter },
+        $cb2 <: contains and { JsReferenceIdentifier(),
+        $setter }
+      }
+    },
+    or {
+      `async () => $aBody`,
+      `async ($_) => $aBody`,
+      `async function () { $aBody }`,
+      `async function ($_) { $aBody }`
+    } where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` }
+  }
+}
+
+pattern async_state_write($component, $setter, $original) {
+  or {
+    async_setter_write($setter),
+    async_setter_write($original),
+    async_setter_write($alias) where {
+      $component <: contains `const $alias = $original` until declaration_boundary()
+    }
+  }
+}
+
 `$setter($arg)` as $call where {
   $setter <: binding_name(),
   or {
@@ -1002,10 +1188,28 @@ pattern if_else_branches($test, $then, $else) {
   $body <: not syncs_with_browser(),
   $call <: direct_in_body($body),
   $call <: within enclosing_function($unused1, $params, $component),
-  $setter <: state_setter($component, $state, $setter, $original),
+  or {
+    $setter <: state_setter($component, $state, $setter, $original),
+    and {
+      $setter <: hook_setter($component, $setter),
+      $component <: contains custom_state_hook_declaration($state, $setter) until declaration_boundary(),
+      $original = $setter
+    }
+  },
   $body <: not open_guard_full_reset($unused1, $component, $params, $deps),
-  $deps <: contains prop_or_context($component, $params, $dependencyProp) where {
-    $dependencyProp <: not invoked_in($body)
+  $deps <: contains or {
+    prop_or_context($component, $params, $dependencyProp),
+    nested_prop_reference($component, $params, $dependencyProp),
+    custom_context_reference($component, $dependencyProp) where {
+      $arg <: contains and { JsReferenceIdentifier(),
+      $dependencyProp }
+    }
+  } where { $dependencyProp <: not invoked_in($body) },
+  or {
+    $arg <: prop_or_context($component, $params, $unusedTopSeedProp),
+    $body <: not contains early_return($topSeedTest) where {
+      $topSeedTest <: seeded_state_guard($component, $body)
+    } until function_node()
   },
   // Avoids JsIfStatement(consequent = ...), which Biome 2.4.5 cannot compile.
   $call <: not within JsElseClause() as $elseClause where {
@@ -1039,19 +1243,43 @@ pattern if_else_branches($test, $then, $else) {
           $call <: not within `if ($guard) { $_ }` where {
             $guard <: contains trigger_prop($component, $params, $body, $deps, $unusedGuardProp)
           },
-          $body <: not contains early_return($seedTest) where {
-            $seedTest <: seeded_state_guard($component, $body)
-          } until function_node(),
           or {
-            $arg <: literal_arg(),
+            $arg <: literal_arg($component),
+            $arg <: contains prop_or_context($component, $params, $unusedSeedProp),
             $call <: not within `if ($seedGuard) { $_ }` where { $seedGuard <: seeded_state_guard($component, $body) }
           },
           $deps <: contains prop_or_context($component, $params, $prop) where {
             $prop <: not controller_prop(),
             $prop <: not invoked_in($body),
-            // Guard-only props gate when a data-reading update runs; a literal update is a reset on that prop.
+            // Open guards also trigger non-functional resets, but not updater functions that seed existing state.
             or {
-              $arg <: literal_arg(),
+              $arg <: literal_arg($component),
+              and {
+                $prop <: r"^(?:open|opened|visible|show|is(?:[A-Z][A-Za-z0-9]*)?(?:Open|Opened|Visible|Shown))$",
+                $arg <: not contains function_node() until or {
+                  JsCallExpression(),
+                  JsNewExpression(),
+                  JsObjectExpression(),
+                  JsArrayExpression()
+                },
+                $arg <: not contains and { JsReferenceIdentifier(),
+                $updater } where {
+                  or {
+                    $component <: contains updater_declaration($updater) until declaration_boundary(),
+                    $body <: contains updater_declaration($updater) until function_node(),
+                    $program <: contains updater_declaration($updater) until or {
+                      function_node(),
+                      JsBlockStatement(),
+                      JsExpressionStatement()
+                    }
+                  }
+                } until or {
+                  JsCallExpression(),
+                  JsNewExpression(),
+                  JsObjectExpression(),
+                  JsArrayExpression()
+                }
+              },
               $body <: not contains early_return($earlyTest) where {
                 $earlyTest <: contains and { JsReferenceIdentifier(),
                 $prop }
@@ -1079,6 +1307,17 @@ pattern if_else_branches($test, $then, $else) {
     and {
       $arg <: not contains prop_reference($component, $body, $params, $unused2),
       $arg <: not contains custom_context_reference($component, $unusedCtx),
+      $body <: not contains `$setter($derivedArg)` as $derivedCall where {
+        $derivedCall <: not $call,
+        $derivedCall <: direct_in_body($body),
+        $derivedArg <: not contains and { JsReferenceIdentifier(),
+        $state },
+        $derivedArg <: contains or {
+          prop_reference($component, $body, $params, $unusedDerivedProp),
+          custom_context_reference($component, $unusedDerivedCtx),
+          state_reference($component, $body, $unusedDerivedState)
+        }
+      },
       or {
         $arg <: not contains JsReferenceIdentifier(),
         $arg <: contains and { JsReferenceIdentifier(),
@@ -1096,31 +1335,26 @@ pattern if_else_branches($test, $then, $else) {
       }
     }
   },
-  $body <: not contains or {
-    `$_.then($cb1)` where {
-      $cb1 <: contains and { JsReferenceIdentifier(),
-      $setter }
-    },
-    `$_.then($cb1, $cb2)` where {
-      or {
-        $cb1 <: contains and { JsReferenceIdentifier(),
-        $setter },
-        $cb2 <: contains and { JsReferenceIdentifier(),
-        $setter }
+  or {
+    $body <: not contains async_state_write($component, $setter, $original),
+    and {
+      $arg <: contains arg_trigger_prop($component, $params, $body, $deps, $unusedBranchProp),
+      $call <: within JsElseClause() as $syncElse where {
+        $syncElse <: within $body,
+        $syncElse <: not contains or {
+          async_state_write($component, $setter, $original),
+          `await $_`
+        },
+        $syncElse <: within JsIfStatement() as $asyncIf where {
+          $asyncIf <: within $body,
+          $syncElse <: not within JsIfStatement() as $innerAsyncIf where {
+            $innerAsyncIf <: not $asyncIf,
+            $innerAsyncIf <: within $asyncIf
+          },
+          $body <: not contains async_state_write($component, $setter, $original) as $asyncWrite where { $asyncWrite <: not within $asyncIf }
+        }
       }
-    },
-    `$_.catch($cb1)` where {
-      $cb1 <: contains and { JsReferenceIdentifier(),
-      $setter }
-    },
-    `$_.finally($cb1)` where {
-      $cb1 <: contains and { JsReferenceIdentifier(),
-      $setter }
-    },
-    `async () => $aBody` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
-    `async ($_) => $aBody` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
-    `async function () { $aBody }` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` },
-    `async function ($_) { $aBody }` where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` }
+    }
   },
   register_diagnostic(span=$call, message=`Avoid adjusting state when a prop changes. Adjust "$state" during render when "$prop" changes, or restructure state so it isn't needed. See https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes`, severity="warn")
 }

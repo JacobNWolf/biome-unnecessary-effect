@@ -154,16 +154,23 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         );
         expect(invokedFormatter?.message).toContain('when "value" changes');
         expect(invokedFormatter?.message).not.toContain('when "format" changes');
-        const triggerAt = (line: number) =>
+        const triggerAt = (fixture: string, line: number) =>
           diagnostics.find(
             ({ location }) =>
-              location.path.endsWith('noAdjustStateOnPropChange/triggerAndDeferral.tsx') &&
+              location.path.endsWith(`noAdjustStateOnPropChange/${fixture}.tsx`) &&
               location.start.line === line,
           )?.message;
-        expect(triggerAt(151)).toContain('when "src" changes');
-        expect(triggerAt(151)).not.toContain('when "editor" changes');
-        expect(triggerAt(188)).toContain('when "initialName" changes');
-        expect(triggerAt(200)).toContain('when "isOpen" changes');
+        expect(triggerAt('triggerAndDeferral', 151)).toContain('when "src" changes');
+        expect(triggerAt('triggerAndDeferral', 151)).not.toContain('when "editor" changes');
+        expect(triggerAt('triggerAndDeferral', 188)).toContain('when "initialName" changes');
+        expect(triggerAt('triggerAndDeferral', 200)).toContain('when "isOpen" changes');
+        expect(triggerAt('sourceTracing', 26)).toContain('when "isOpen" changes');
+        expect(triggerAt('sourceTracing', 26)).not.toContain('when "field" changes');
+        expect(triggerAt('sourceTracing', 76)).toMatch(/when "(src|id)" changes/);
+        expect(triggerAt('sourceTracing', 76)).not.toContain('when "editor" changes');
+        expect(triggerAt('sourceTracing', 95)).toContain('when "pages" changes');
+        expect(triggerAt('sourceTracing', 114)).toContain('when "pages" changes');
+        expect(triggerAt('guardTriggers', 70)).toContain('when "isOpen" changes');
         const priority = diagnostics
           .filter(({ location }) => location.path.endsWith('triggerPriority.tsx'))
           .sort((a, b) => a.location.start.line - b.location.start.line);
