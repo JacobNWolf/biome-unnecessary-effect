@@ -780,6 +780,41 @@ pattern state_only_helper($component) {
   }
 }
 
+// Snippet variants avoid JsCallExpression(callee = ...) and JsStaticMemberExpression(member = ...), which Biome 2.4.5 rejects.
+pattern async_or_accumulating_write($component, $target, $state) {
+  contains `$target($otherArg)` as $otherCall where {
+    or {
+      $otherCall <: within or {
+        `$_.then($...)`,
+        `$_.catch($...)`,
+        `$_.finally($...)`
+      },
+      $otherCall <: within function_node() as $asyncFn where {
+        $asyncFn <: r"^async\b[\s\S]*",
+        $asyncFn <: contains `await $_`
+      },
+      $otherCall <: within or {
+        `setTimeout($...)`,
+        `setInterval($...)`,
+        `window.setTimeout($...)`,
+        `window.setInterval($...)`
+      },
+      $otherArg <: or {
+        and { identifier_reference(),
+        $state },
+        contains and { JsReferenceIdentifier(),
+        $state }
+      },
+      $otherArg <: contains function_node() until or {
+        JsCallExpression(),
+        JsNewExpression(),
+        JsObjectExpression(),
+        JsArrayExpression()
+      }
+    }
+  }
+}
+
 pattern hook_setter($component, $setter) {
   $setter as $setterUse where {
     $setter <: identifier_reference(),
@@ -804,6 +839,7 @@ pattern hook_setter($component, $setter) {
     $setterUse <: not within or {
       function_node(),
       JsBlockStatement(),
+      JsSwitchStatement(),
       JsCatchClause(),
       JsForStatement(),
       JsForInStatement(),
@@ -816,6 +852,7 @@ pattern hook_setter($component, $setter) {
         $shadowBinding <: not within or {
           function_node(),
           JsBlockStatement(),
+          JsSwitchStatement(),
           JsCatchClause(),
           JsForStatement(),
           JsForInStatement(),
@@ -826,7 +863,10 @@ pattern hook_setter($component, $setter) {
           $innerScope <: not `function $setter($...) { $... }`,
           or {
             $innerScope <: function_node(),
-            $shadowBinding <: not within and { JsVariableDeclaration(),
+            $shadowBinding <: not within and { or {
+              JsVariableDeclaration(),
+              JsForVariableDeclaration()
+            },
             r"(?s)var\s.*" }
           }
         }
