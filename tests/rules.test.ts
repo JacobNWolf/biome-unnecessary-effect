@@ -157,8 +157,7 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         const triggerAt = (fixture: string, line: number) =>
           diagnostics.find(
             ({ location }) =>
-              location.path.endsWith(`noAdjustStateOnPropChange/${fixture}.tsx`) &&
-              location.start.line === line,
+              location.path.endsWith(`noAdjustStateOnPropChange/${fixture}.tsx`) && location.start.line === line,
           )?.message;
         expect(triggerAt('triggerAndDeferral', 151)).toContain('when "src" changes');
         expect(triggerAt('triggerAndDeferral', 151)).not.toContain('when "editor" changes');

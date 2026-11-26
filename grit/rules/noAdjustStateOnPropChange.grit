@@ -1172,9 +1172,7 @@ pattern async_state_write($component, $setter, $original) {
   or {
     async_setter_write($setter),
     async_setter_write($original),
-    async_setter_write($alias) where {
-      $component <: contains `const $alias = $original` until declaration_boundary()
-    }
+    async_setter_write($alias) where { $component <: contains `const $alias = $original` until declaration_boundary() }
   }
 }
 
@@ -1351,7 +1349,9 @@ pattern async_state_write($component, $setter, $original) {
             $innerAsyncIf <: not $asyncIf,
             $innerAsyncIf <: within $asyncIf
           },
-          $body <: not contains async_state_write($component, $setter, $original) as $asyncWrite where { $asyncWrite <: not within $asyncIf }
+          $body <: not contains async_state_write($component, $setter, $original) as $asyncWrite where {
+            $asyncWrite <: not within $asyncIf
+          }
         }
       }
     }
