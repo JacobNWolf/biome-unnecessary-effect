@@ -1026,6 +1026,7 @@ pattern literal_arg($component) {
       JsIdentifierBinding() } as $topConstBinding where {
         $topConstBinding <: within and { JsVariableDeclaration(),
         r"^const\b[\s\S]*" },
+        $topConstBinding <: not within updater_declaration($constRef),
         $topConstBinding <: within JsVariableDeclarator() as $topConstDeclarator,
         $topConstDeclarator <: not contains function_node() until or {
           JsCallExpression(),
@@ -1072,7 +1073,13 @@ pattern state_driven_guard($component, $body, $arg) {
 pattern updater_declaration($updater) {
   or {
     `function $updater($_) { $_ }`,
-    `const $updater = $updaterValue` where { $updaterValue <: function_node() }
+    // Bare aliases may hold functions; do not infer a replacement value through an unresolved alias chain.
+    `const $updater = $updaterValue` where {
+      $updaterValue <: or {
+        function_node(),
+        identifier_reference()
+      }
+    }
   }
 }
 
@@ -1181,22 +1188,63 @@ pattern if_else_branches($test, $then, $else) {
   }
 }
 
-pattern async_setter_write($setter) {
+pattern async_setter_reference($component, $setter) {
+  and { JsReferenceIdentifier(),
+  $setter } as $reference where {
+    $reference <: not within or {
+      function_node(),
+      JsBlockStatement(),
+      JsSwitchStatement(),
+      JsCatchClause(),
+      JsForStatement(),
+      JsForInStatement(),
+      JsForOfStatement()
+    } as $scope where {
+      $scope <: within $component,
+      $scope <: contains and { JsIdentifierBinding(),
+      $setter } as $shadowBinding where {
+        $shadowBinding <: not within or {
+          function_node(),
+          JsBlockStatement(),
+          JsSwitchStatement(),
+          JsCatchClause(),
+          JsForStatement(),
+          JsForInStatement(),
+          JsForOfStatement()
+        } as $innerScope where {
+          $innerScope <: not $scope,
+          $innerScope <: within $scope,
+          $innerScope <: not `function $setter($...) { $... }`,
+          or {
+            $innerScope <: function_node(),
+            $shadowBinding <: not within and { or {
+              JsVariableDeclaration(),
+              JsForVariableDeclaration()
+            },
+            r"(?s)var\s.*" }
+          }
+        }
+      } until or {
+        JsInitializerClause(),
+        JsComputedMemberName(),
+        JsExpressionStatement(),
+        JsReturnStatement()
+      }
+    }
+  }
+}
+
+pattern async_setter_write($component, $setter) {
   or {
     or {
       `$_.then($cb1)`,
       `$_.catch($cb1)`,
       `$_.finally($cb1)`
-    } where {
-      $cb1 <: contains and { JsReferenceIdentifier(),
-      $setter }
-    },
+    } where { $cb1 <: contains async_setter_reference($component, $setter) },
     `$_.then($cb1, $cb2)` where {
       or {
-        $cb1 <: contains and { JsReferenceIdentifier(),
-        $setter },
-        $cb2 <: contains and { JsReferenceIdentifier(),
-        $setter }
+        $cb1 <: contains async_setter_reference($component, $setter),
+        $cb2 <: contains async_setter_reference($component, $setter)
       }
     },
     or {
@@ -1204,15 +1252,32 @@ pattern async_setter_write($setter) {
       `async ($_) => $aBody`,
       `async function () { $aBody }`,
       `async function ($_) { $aBody }`
-    } where { $aBody <: contains `await $_`, $aBody <: contains `$setter($_)` }
+    } where {
+      $aBody <: contains `await $_`,
+      $aBody <: contains `$setter($_)` as $asyncCall where {
+        $asyncCall <: contains async_setter_reference($component, $setter)
+      }
+    }
   }
 }
 
 pattern async_state_write($component, $setter, $original) {
   or {
-    async_setter_write($setter),
-    async_setter_write($original),
-    async_setter_write($alias) where { $component <: contains `const $alias = $original` until declaration_boundary() }
+    async_setter_write($component, $setter),
+    async_setter_write($component, $original),
+    $asyncWrite where {
+      $component <: contains `const $alias = $original` where {
+        $asyncWrite <: async_setter_write($component, $alias)
+      } until declaration_boundary()
+    }
+  }
+}
+
+pattern if_with_test($test) {
+  or {
+    `if ($test) { $_ }`,
+    `if ($test) $_`,
+    `if ($test) { $_ } else { $_ }`
   }
 }
 
@@ -1366,6 +1431,20 @@ pattern async_state_write($component, $setter, $original) {
         $component <: not async_or_accumulating_write($component, $original, $state),
         $component <: not contains `const $derivedAlias = $original` where {
           $component <: async_or_accumulating_write($component, $derivedAlias, $state)
+        },
+        $component <: not contains if_with_test($selfTest) as $selfGuard where {
+          $selfGuard <: contains or {
+            `$setter($guardArg)`,
+            `$original($guardArg)`
+          },
+          $selfTest <: contains and { JsReferenceIdentifier(),
+          $state },
+          $selfTest <: not contains or {
+            `$state !== $guardArg`,
+            `$guardArg !== $state`,
+            `$state != $guardArg`,
+            `$guardArg != $state`
+          }
         },
         $derivedArg <: not contains and { JsReferenceIdentifier(),
         $state },
