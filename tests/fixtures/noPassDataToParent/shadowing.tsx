@@ -285,3 +285,111 @@ export function CloserBindingInsideAlias(props) {
     }
   }
 }
+
+export function ParameterInitializerBeforeBodyVar({ onData }) {
+  const data = useSomeAPI();
+  const notify = (value, ignored = onData(value)) => {
+    var onData = persist;
+  };
+  useEffect(() => {
+    notify(data); // expect: noPassDataToParent
+  }, [data, notify]);
+}
+
+export function FunctionParameterInitializerBeforeBodyVar({ onData }) {
+  const data = useSomeAPI();
+  const notify = function (value, ignored = onData(value)) {
+    var onData = persist;
+  };
+  useEffect(() => {
+    notify(data); // expect: noPassDataToParent
+  }, [data, notify]);
+}
+
+export function BodyReferenceWithParameterInitializer({ onData }) {
+  const data = useSomeAPI();
+  const notify = (value, ignored = true) => {
+    var onData = persist;
+    onData(value);
+  };
+  useEffect(() => {
+    notify(data);
+  }, [data, notify]);
+}
+
+export function ShadowedParameterInitializer({ onData }) {
+  const data = useSomeAPI();
+  const notify = (value, onData = persist, ignored = onData(value)) => {};
+  useEffect(() => {
+    notify(data);
+  }, [data, notify]);
+}
+
+declare function register(value: object): boolean;
+
+export function SiblingObjectGetterVar({ onData }) {
+  const data = useSomeAPI();
+  useEffect(() => {
+    if (register({
+      get active() {
+        var onData = persist;
+        return true;
+      },
+    })) {
+      onData(data); // expect: noPassDataToParent
+    }
+  }, [data, onData]);
+}
+
+export function SiblingObjectSetterVar({ onData }) {
+  const data = useSomeAPI();
+  useEffect(() => {
+    if (register({
+      set active(value) {
+        var onData = persist;
+      },
+    })) {
+      onData(data); // expect: noPassDataToParent
+    }
+  }, [data, onData]);
+}
+
+export function ExecutableObjectAccessorBindings({ onData }) {
+  const data = useSomeAPI();
+  useEffect(() => {
+    register({
+      get active() {
+        var onData = persist;
+        onData(data);
+        return true;
+      },
+      set active(onData) {
+        onData(data);
+      },
+    });
+  }, [data, onData]);
+}
+
+export function ConstructorOverloadParameter({ onData }) {
+  const data = useSomeAPI();
+  useEffect(() => {
+    class Box {
+      constructor(onData: number);
+      constructor(value: number) {
+        onData(data); // expect: noPassDataToParent
+      }
+    }
+  }, [data, onData]);
+}
+
+export function ConstructorImplementationParameter({ onData }) {
+  const data = useSomeAPI();
+  useEffect(() => {
+    class Box {
+      constructor(value: number);
+      constructor(onData) {
+        onData(data);
+      }
+    }
+  }, [data, onData]);
+}

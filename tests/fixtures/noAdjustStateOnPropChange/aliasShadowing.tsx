@@ -97,3 +97,30 @@ export function UnshadowedNestedSource(props) {
   }
   return <input value={draft} onChange={event => setDraft(event.target.value)} />;
 }
+
+declare const defaults: { group: { item: string } };
+
+export function ShadowedNestedPropRoot(props) {
+  const [selected, setSelected] = useState('');
+  {
+    const props = defaults;
+    const group = props.group;
+    const item = group.item;
+    useEffect(() => {
+      setSelected(item);
+    }, [item]);
+  }
+  return <input value={selected} onChange={event => setSelected(event.target.value)} />;
+}
+
+export function UnshadowedNestedPropRoot(props) {
+  const [selected, setSelected] = useState('');
+  {
+    const group = props.group;
+    const item = group.item;
+    useEffect(() => {
+      setSelected(item); // expect: noAdjustStateOnPropChange
+    }, [item]);
+  }
+  return <input value={selected} onChange={event => setSelected(event.target.value)} />;
+}
