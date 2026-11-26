@@ -206,3 +206,21 @@ export function ResetOnOpen({ isOpen }: { isOpen: boolean }) {
     </button>
   );
 }
+
+declare function toRgba(color: string): { a: number };
+
+export function ColorPickerInput({ color }: { color?: string }) {
+  const [opacity, setOpacity] = useState<number>();
+  const [inner, setInner] = useState<string>();
+  useEffect(() => {
+    if (!color) {
+      setOpacity(1);
+      setInner(undefined);
+      return;
+    }
+    const { a } = toRgba(color);
+    setOpacity(a); // expect: noDerivedState, noDerivedStateDeep
+    setInner(color); // expect: noDerivedState, noDerivedStateDeep
+  }, [color]);
+  return <input value={inner} style={{ opacity }} readOnly />;
+}

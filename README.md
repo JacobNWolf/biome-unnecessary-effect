@@ -286,6 +286,8 @@ Adjust the state during render when `items` changes, or store an ID instead of t
 
 The message names the prop that causes the update, even through one local variable. It prefers data props over early-return guards, controller objects and unrelated side effects. Effects that reset several states behind an open guard are left to [`noResetAllStateOnPropChange`](#noresetallstateonpropchange).
 
+It also recognizes `[state, setState]` tuples from custom hooks named `use*State`, such as `useStoredState`.
+
 ### `noResetAllStateOnPropChange`
 
 ```tsx
@@ -408,7 +410,7 @@ The GritQL rules match names, not bindings, and follow data through one local va
 - **They can report shadowed names.** A local `const error` in an effect counts as the state variable `error`.
 - **`noEventHandler` reports at most once per effect**, preferring a non-early-return `if` guard over an early-return bail-out guard.
 - **`noChainStateUpdates` skips two guard patterns:** one-shot boolean latch flags written only as `setFlag(true)` inside the same `if (!flag ...)` effect, and negated boolean guards (`if (!isFocused)`) whose setter argument reads a non-state, non-callable dependency from the effect's dependency array.
-- **`noAdjustStateOnPropChange` skips the whole effect** when it sets the state asynchronously anywhere (`.then`, `.catch`, `.finally`, `await`), even if another branch sets it synchronously.
+- **`noAdjustStateOnPropChange` skips effects that set the state asynchronously** (`.then`, `.catch`, `.finally`, `await`), unless the synchronous write is in an `else` branch with no async write or `await`, and all async writes are inside the same `if` statement.
 - **`noEventHandler` can't tell a user-driven prop from a prop that syncs with a server, URL or editor**, and can't prove your helpers are pure. A call to a helper that does more than set state counts as a side effect.
 
 `noInitializeState` doesn't report an effect with no dependency array. `noSetStateInEffectWithoutDeps` reports it.

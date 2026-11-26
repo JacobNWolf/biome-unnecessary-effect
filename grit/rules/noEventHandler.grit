@@ -291,6 +291,7 @@ pattern effect_only_state($scope, $body, $source) {
 pattern prop_expression($params) {
   or {
     `$object.$_`,
+    JsStaticMemberExpression(object=$object),
     $object
   } where {
     $object <: binding_name(),
@@ -780,6 +781,123 @@ pattern state_only_helper($component) {
     } until declaration_boundary()
   }
 }
+
+// Snippet variants avoid JsCallExpression(callee = ...) and JsStaticMemberExpression(member = ...), which Biome 2.4.5 rejects.
+pattern async_or_accumulating_write($component, $target, $state) {
+  contains `$target($otherArg)` as $otherCall where {
+    or {
+      $otherCall <: within or {
+        `$_.then($...)`,
+        `$_.catch($...)`,
+        `$_.finally($...)`
+      },
+      $otherCall <: within function_node() as $asyncFn where {
+        $asyncFn <: r"^async\b[\s\S]*",
+        $asyncFn <: contains `await $_`
+      },
+      $otherCall <: within or {
+        `setTimeout($...)`,
+        `setInterval($...)`,
+        `window.setTimeout($...)`,
+        `window.setInterval($...)`
+      },
+      $otherArg <: or {
+        and { identifier_reference(),
+        $state },
+        contains and { JsReferenceIdentifier(),
+        $state }
+      },
+      $otherArg <: contains function_node() until or {
+        JsCallExpression(),
+        JsNewExpression(),
+        JsObjectExpression(),
+        JsArrayExpression()
+      }
+    }
+  }
+}
+
+pattern hook_setter($component, $setter) {
+  $setter as $setterUse where {
+    $setter <: identifier_reference(),
+    $setter <: r"set[A-Z][A-Za-z0-9_$]*",
+    $component <: contains `const $binding = $hookCall` as $hookDeclaration where {
+      $hookCall <: or {
+        `$hook($...)`,
+        `$hook<$_>($...)`,
+        `$hook()`,
+        `$hook<$_>()`
+      } where { $hook <: r"^use[A-Z][A-Za-z0-9_]*$" },
+      $binding <: and { or {
+        JsArrayBindingPattern(),
+        JsObjectBindingPattern()
+      },
+      contains and { JsIdentifierBinding(),
+      $setter } until or {
+        JsInitializerClause(),
+        JsComputedMemberName()
+      } }
+    } until declaration_boundary(),
+    $setterUse <: not within or {
+      function_node(),
+      JsBlockStatement(),
+      JsSwitchStatement(),
+      JsCatchClause(),
+      JsForStatement(),
+      JsForInStatement(),
+      JsForOfStatement()
+    } as $scope where {
+      $scope <: within $component,
+      $scope <: contains and { $setter,
+      JsIdentifierBinding() } as $shadowBinding where {
+        $shadowBinding <: not within $hookDeclaration,
+        $shadowBinding <: not within or {
+          function_node(),
+          JsBlockStatement(),
+          JsSwitchStatement(),
+          JsCatchClause(),
+          JsForStatement(),
+          JsForInStatement(),
+          JsForOfStatement()
+        } as $innerScope where {
+          $innerScope <: not $scope,
+          $innerScope <: within $scope,
+          $innerScope <: not `function $setter($...) { $... }`,
+          or {
+            $innerScope <: function_node(),
+            $shadowBinding <: not within and { or {
+              JsVariableDeclaration(),
+              JsForVariableDeclaration()
+            },
+            r"(?s)var\s.*" }
+          }
+        }
+      } until or {
+        JsInitializerClause(),
+        JsComputedMemberName(),
+        JsExpressionStatement(),
+        JsReturnStatement()
+      }
+    }
+  }
+}
+
+pattern custom_state_hook_declaration($state, $setter) {
+  or {
+    `const [$state, $setter] = $call`,
+    `const [$state = $_, $setter] = $call`
+  } where {
+    $state <: binding_name(),
+    $setter <: r"set[A-Z][A-Za-z0-9_$]*",
+    $call <: or {
+      `$hook($...)`,
+      `$hook<$_>($...)`,
+      `$hook()`,
+      `$hook<$_>()`
+    } where { $hook <: r"^use[A-Z][A-Za-z0-9_]*State$" }
+  }
+}
+
 // Calls inside setter arguments compute the next value rather than synchronize an external system.
 pattern side_effect_call($component) {
   JsCallExpression() as $call where {
@@ -811,65 +929,6 @@ pattern enclosing_function($name, $params, $body) {
   } } where { $name <: r"[A-Z][A-Za-z0-9_]*|use[A-Z][A-Za-z0-9_]*" }
 }
 // prelude:end
-pattern hook_setter($component, $setter) {
-  $setter as $setterUse where {
-    $setter <: identifier_reference(),
-    $setter <: r"set[A-Z][A-Za-z0-9_$]*",
-    $component <: contains `const $binding = $hookCall` as $hookDeclaration where {
-      $hookCall <: or {
-        `$hook($...)`,
-        `$hook<$_>($...)`,
-        `$hook()`,
-        `$hook<$_>()`
-      } where { $hook <: r"^use[A-Z][A-Za-z0-9_]*$" },
-      $binding <: and { or {
-        JsArrayBindingPattern(),
-        JsObjectBindingPattern()
-      },
-      contains and { JsIdentifierBinding(),
-      $setter } until or {
-        JsInitializerClause(),
-        JsComputedMemberName()
-      } }
-    } until declaration_boundary(),
-    $setterUse <: not within or {
-      function_node(),
-      JsBlockStatement(),
-      JsCatchClause(),
-      JsForStatement(),
-      JsForInStatement(),
-      JsForOfStatement()
-    } as $scope where {
-      $scope <: within $component,
-      $scope <: contains and { $setter,
-      JsIdentifierBinding() } as $shadowBinding where {
-        $shadowBinding <: not within $hookDeclaration,
-        $shadowBinding <: not within or {
-          function_node(),
-          JsBlockStatement(),
-          JsCatchClause(),
-          JsForStatement(),
-          JsForInStatement(),
-          JsForOfStatement()
-        } as $innerScope where {
-          $innerScope <: not $scope,
-          $innerScope <: within $scope,
-          $innerScope <: not `function $setter($...) { $... }`,
-          or {
-            $innerScope <: function_node(),
-            $shadowBinding <: not within and { JsVariableDeclaration(),
-            r"(?s)var\s.*" }
-          }
-        }
-      } until or {
-        JsInitializerClause(),
-        JsComputedMemberName(),
-        JsExpressionStatement(),
-        JsReturnStatement()
-      }
-    }
-  }
-}
 
 pattern event_side_effect_call($component) {
   side_effect_call($component) as $call where {

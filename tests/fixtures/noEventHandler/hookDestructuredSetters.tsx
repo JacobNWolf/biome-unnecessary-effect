@@ -15,7 +15,7 @@ export function ArrayHookSetter({ streaming }: { streaming: boolean }) {
   const [open, setOpen] = useDisclosureState(false);
 
   useEffect(() => {
-    if (streaming) setOpen(true);
+    if (streaming) setOpen(true); // expect: noAdjustStateOnPropChange
   }, [streaming]);
 
   return <div hidden={!open} />;
@@ -49,7 +49,7 @@ export function HookSetterWithComputedArgument({ streaming }: { streaming: boole
   const [open, setOpen] = useDisclosureState(false);
 
   useEffect(() => {
-    if (streaming) setOpen(computeNext(streaming));
+    if (streaming) setOpen(computeNext(streaming)); // expect: noAdjustStateOnPropChange
   }, [streaming]);
 
   return <div hidden={!open} />;
@@ -86,7 +86,7 @@ export function HookSetterAndSideEffect({ streaming }: { streaming: boolean }) {
 
   useEffect(() => {
     if (streaming) { // expect: noEventHandler
-      setOpen(true);
+      setOpen(true); // expect: noAdjustStateOnPropChange
       track('open');
     }
   }, [streaming]);
