@@ -407,7 +407,7 @@ The GritQL rules match names, not bindings, and follow data through one local va
 - **They miss renamed imports**, such as `import { useEffect as useFx }`.
 - A setter called inside a renamed effect hook counts as a write outside effects, so `noDerivedState` skips that state.
 - Only `noPassLiveStateToParent` and `noPassDataToParent` follow props destructured after the signature.
-- **They can report shadowed names.** A local `const error` in an effect counts as the state variable `error`.
+- **State reads and some prop lookups still match by name.** A local `const error` in an effect can count as the state variable `error`. Prop/context and parent-callback lookups skip shadowed bindings, except prop lookups in `noDerivedState` and `noChainStateUpdates`. Effect-local aliases and class getters/setters are not resolved. Switch-case aliases can be incorrectly treated as visible to effects in the switch discriminant.
 - **`noEventHandler` reports at most once per effect**, preferring a non-early-return `if` guard over an early-return bail-out guard.
 - **`noChainStateUpdates` skips two guard patterns:** one-shot boolean latch flags written only as `setFlag(true)` inside the same `if (!flag ...)` effect, and negated boolean guards (`if (!isFocused)`) whose setter argument reads a non-state, non-callable dependency from the effect's dependency array.
 - **`noAdjustStateOnPropChange` skips effects that set the state asynchronously** (`.then`, `.catch`, `.finally`, `await`), unless the synchronous write is in an `else` branch with no async write or `await`, and all async writes are inside the same `if` statement.
