@@ -299,15 +299,19 @@ pattern prop_expression($params) {
 }
 
 pattern prop_or_context($scope, $params, $ref) {
-  $ref where {
+  $ref as $refUse where {
     $ref <: identifier_reference(),
     or {
-      $params <: contains and { JsIdentifierBinding(),
-      $ref } until JsInitializerClause(),
-      $scope <: contains `const [$ref] = [$value]` where {
-        $value <: prop_expression($params)
+      and {
+        $params <: contains and { JsIdentifierBinding(),
+        $ref } until JsInitializerClause(),
+        $refUse <: unshadowed_reference($scope, declaration=$scope)
+      },
+      $scope <: contains `const [$ref] = [$value]` as $aliasDeclaration where {
+        $value <: scoped_prop_expression($scope, $params),
+        $refUse <: unshadowed_reference($scope, $aliasDeclaration)
       } until declaration_boundary(),
-      $scope <: contains `const $binding = $value` where {
+      $scope <: contains `const $binding = $value` as $aliasDeclaration where {
         $binding <: or {
           $ref,
           and { JsObjectBindingPattern(),
@@ -320,33 +324,46 @@ pattern prop_or_context($scope, $params, $ref) {
         $value <: or {
           `useContext($_)`,
           `React.useContext($_)`,
-          prop_expression($params),
+          scoped_prop_expression($scope, $params),
           and { function_node(),
-          contains `$prop($_)` where { $prop <: prop_expression($params) } }
-        }
+          contains `$prop($_)` where { $prop <: scoped_prop_expression($scope, $params) } }
+        },
+        $refUse <: unshadowed_reference($scope, $aliasDeclaration)
       } until declaration_boundary()
     }
+  }
+}
+
+pattern scoped_prop_expression($scope, $params) {
+  or {
+    `$propRoot.$_`,
+    JsStaticMemberExpression(object=$propRoot),
+    $propRoot
+  } where {
+    $propRoot <: identifier_reference(),
+    $propRoot <: prop_expression($params),
+    $propRoot <: unshadowed_reference($scope, declaration=$scope)
   }
 }
 
 pattern parent_callback($scope, $params) {
   or {
     prop_or_context($scope, $params, $unusedRef),
-    prop_expression($params),
+    scoped_prop_expression($scope, $params),
     `$asserted!` where {
       $asserted <: or {
         prop_or_context($scope, $params, $unusedAsserted),
-        prop_expression($params)
+        scoped_prop_expression($scope, $params)
       }
     },
-    `($object as $_).$_` where { $object <: prop_expression($params) }
+    `($object as $_).$_` where { $object <: scoped_prop_expression($scope, $params) }
   }
 }
 
 pattern custom_context_reference($scope, $ref) {
-  $ref where {
+  $ref as $refUse where {
     $ref <: identifier_reference(),
-    $scope <: contains `const $binding = $context` where {
+    $scope <: contains `const $binding = $context` as $contextDeclaration where {
       $context <: or {
         `$ctxHook($...)`,
         `$ctxHook<$_>($...)`,
@@ -361,7 +378,8 @@ pattern custom_context_reference($scope, $ref) {
           JsInitializerClause(),
           JsComputedMemberName()
         } }
-      }
+      },
+      $refUse <: unshadowed_reference($scope, $contextDeclaration)
     } until declaration_boundary()
   }
 }
@@ -815,6 +833,90 @@ pattern async_or_accumulating_write($component, $target, $state) {
   }
 }
 
+pattern binding_scope() {
+  or {
+    function_node(),
+    JsMethodClassMember(),
+    JsGetterClassMember(),
+    JsSetterClassMember(),
+    JsConstructorClassMember(),
+    JsStaticInitializationBlockClassMember(),
+    JsBlockStatement(),
+    JsSwitchStatement(),
+    JsCatchClause(),
+    JsForStatement(),
+    JsForInStatement(),
+    JsForOfStatement()
+  }
+}
+
+// Nested block `var` and function declarations bind in their enclosing scope.
+// Passing the component for parameter references exempts no nested binding; same-name use/parameter nodes can exempt shadows because `within` matches by text.
+pattern unshadowed_reference($component, $declaration) {
+  $shadowName as $use where {
+    $declaration <: not within binding_scope() as $declarationScope where {
+      $declarationScope <: within $component,
+      $use <: not within $declarationScope
+    },
+    $use <: not within binding_scope() as $scope where {
+      $scope <: within $component,
+      $scope <: contains and { $shadowName,
+      JsIdentifierBinding() } as $shadowBinding where {
+        $declaration <: not within binding_scope() as $aliasScope where {
+          $aliasScope <: not $scope,
+          $aliasScope <: within $scope
+        },
+        or {
+          $scope <: not JsSwitchStatement(),
+          // Biome 2.4.5 cannot compile switch fields; only case clauses share the switch's lexical bindings.
+          $use <: within or {
+            JsCaseClause(),
+            JsDefaultClause()
+          } as $case where { $case <: within $scope until JsSwitchStatement() }
+        },
+        // `within $declaration` compares text; an identical declaration in a nearer scope is still a shadow.
+        or { $shadowBinding <: not within $declaration, $declaration <: not within $scope },
+        $shadowBinding <: not within or {
+          TsFunctionType(),
+          TsConstructorType(),
+          TsMethodSignatureTypeMember(),
+          TsMethodSignatureClassMember(),
+          TsSetterSignatureTypeMember(),
+          TsSetterSignatureClassMember(),
+          TsCallSignatureTypeMember(),
+          TsConstructSignatureTypeMember(),
+          TsIndexSignatureTypeMember()
+        },
+        $shadowBinding <: not within binding_scope() as $innerScope where {
+          $innerScope <: not $scope,
+          $innerScope <: within $scope,
+          $innerScope <: not `function $shadowName($...) { $... }`,
+          or {
+            $innerScope <: or {
+              function_node(),
+              JsMethodClassMember(),
+              JsGetterClassMember(),
+              JsSetterClassMember(),
+              JsConstructorClassMember(),
+              JsStaticInitializationBlockClassMember()
+            },
+            $shadowBinding <: not within and { or {
+              JsVariableDeclaration(),
+              JsForVariableDeclaration()
+            },
+            r"(?s)^var\b.*" }
+          }
+        }
+      } until or {
+        JsInitializerClause(),
+        JsComputedMemberName(),
+        JsExpressionStatement(),
+        JsReturnStatement()
+      }
+    }
+  }
+}
+
 pattern hook_setter($component, $setter) {
   $setter as $setterUse where {
     $setter <: identifier_reference(),
@@ -834,49 +936,9 @@ pattern hook_setter($component, $setter) {
       $setter } until or {
         JsInitializerClause(),
         JsComputedMemberName()
-      } }
-    } until declaration_boundary(),
-    $setterUse <: not within or {
-      function_node(),
-      JsBlockStatement(),
-      JsSwitchStatement(),
-      JsCatchClause(),
-      JsForStatement(),
-      JsForInStatement(),
-      JsForOfStatement()
-    } as $scope where {
-      $scope <: within $component,
-      $scope <: contains and { $setter,
-      JsIdentifierBinding() } as $shadowBinding where {
-        $shadowBinding <: not within $hookDeclaration,
-        $shadowBinding <: not within or {
-          function_node(),
-          JsBlockStatement(),
-          JsSwitchStatement(),
-          JsCatchClause(),
-          JsForStatement(),
-          JsForInStatement(),
-          JsForOfStatement()
-        } as $innerScope where {
-          $innerScope <: not $scope,
-          $innerScope <: within $scope,
-          $innerScope <: not `function $setter($...) { $... }`,
-          or {
-            $innerScope <: function_node(),
-            $shadowBinding <: not within and { or {
-              JsVariableDeclaration(),
-              JsForVariableDeclaration()
-            },
-            r"(?s)var\s.*" }
-          }
-        }
-      } until or {
-        JsInitializerClause(),
-        JsComputedMemberName(),
-        JsExpressionStatement(),
-        JsReturnStatement()
-      }
-    }
+      } },
+      $setterUse <: unshadowed_reference($component, $hookDeclaration)
+    } until declaration_boundary()
   }
 }
 

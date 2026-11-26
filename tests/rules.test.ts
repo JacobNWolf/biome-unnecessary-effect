@@ -170,6 +170,10 @@ describe(`rules (Biome ${BIOME_VERSION})`, () => {
         expect(triggerAt('sourceTracing', 95)).toContain('when "pages" changes');
         expect(triggerAt('sourceTracing', 114)).toContain('when "pages" changes');
         expect(triggerAt('guardTriggers', 70)).toContain('when "isOpen" changes');
+        for (const line of [41, 61, 71]) {
+          expect(triggerAt('aliasShadowing', line)).toContain('when "id" changes');
+          expect(triggerAt('aliasShadowing', line)).not.toContain('when "value" changes');
+        }
         const priority = diagnostics
           .filter(({ location }) => location.path.endsWith('triggerPriority.tsx'))
           .sort((a, b) => a.location.start.line - b.location.start.line);
